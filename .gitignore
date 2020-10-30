@@ -1,2 +1,10 @@
 # data
 lab1/dataset/
+
+#output
+lab1/output/*
+
+#pycache
+lab1/src/__pycache__/*
+
+
