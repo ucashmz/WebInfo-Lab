@@ -3,5 +3,6 @@ conf = {
     "dataset_path":"dataset\\maildir\\",
     "filename_path":"output\\filename.csv",
     "inverted_table": "output\\inverted_table",
+    "error_log": "output\\error_log.txt",
     "checkpoint": 10000
 } 

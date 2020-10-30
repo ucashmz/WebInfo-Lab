@@ -4,12 +4,19 @@ from nltk import word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 
+# TODO error handling mode
+# be used to try files in error_log again after error fixed
 
-def read_file(file_path):
+# TODO merge inverted table
+
+
+def read_file(file_path, error_log, counter):
     with open(file_path,'r',encoding='utf-8') as f:
         try:
             content = f.read()
         except:
+            with open(error_log, 'a')as log:
+                log.writelines([str(counter),",problems in ",file_path])
             print("problems in",file_path)
             return []
         paragraphs = content.split('\n\n')[1:] # discard header of the email
@@ -23,8 +30,8 @@ def tokenize_paragraph(paragraph, punctuation, stops):
     word_stem = [PorterStemmer().stem(word) for word in word_without_num]
     return set(word_stem)
 
-def tokenize_file(file_path):
-    paragraphs = read_file(file_path)
+def tokenize_file(file_path, error_log, counter):
+    paragraphs = read_file(file_path, error_log, counter)
     punctuation = set([',', '.', ':', ';', '?', '(', ')', '[', ']', '&', '!', '*', '@', '#', '$', '%','...','-','--'])
     stops = set(stopwords.words("english")+['am','pm','ect','cc','ps'])
     # print(stops)
@@ -41,6 +48,7 @@ class BoolSearch:
         self.filename_path = config['filename_path']
         self.inverted_table = config['inverted_table']
         self.checkpoint = config['checkpoint']
+        self.error_log = config['error_log']
     
     def load_checkpoint(self):
         i = 0
@@ -54,10 +62,14 @@ class BoolSearch:
 
     def run(self):
         if os.path.exists(self.filename_path):
-            print("Load from", self.filename_path)
+            print("File name load from", self.filename_path)
         else:
             self.save_filename()
-        self.get_inverted_table()
+
+        if os.path.exists(self.inverted_table + ".csv"):
+            print("Inverted_table load from", self.inverted_table + ".csv")
+        else:
+            self.get_inverted_table()
     
     def get_inverted_table(self):
         checkpoint = self.load_checkpoint()
@@ -66,11 +78,11 @@ class BoolSearch:
             file_operation_ctr = 0
             filename = f.readline().split('\n')[0]
             while filename:
-                words = dict()
-                word_list = list()
-                inverted_table = list()
+                words = dict() # key=word value=index, use dict to reduce time complexity of finding word
+                word_list = list() # [word1,word2,...] use word_list to get word by index
+                inverted_table = list() # inverted_table[i] = [file_id for file if word_list[i] appears in file]
                 word_ctr = 0
-                while file_operation_ctr < self.checkpoint and filename:
+                while file_operation_ctr < self.checkpoint and filename: # save checkpoint 
                     if file_ctr < checkpoint:
                         file_ctr += 1
                         filename = f.readline().split('\n')[0]
@@ -78,7 +90,7 @@ class BoolSearch:
 
                     file_path = os.path.join(self.dataset_path, filename)
                     # print(file_path)
-                    for word in tokenize_file(file_path):
+                    for word in tokenize_file(file_path, self.error_log, file_ctr):
                         if word in words:
                             inverted_table[words[word]].append(file_ctr)
                         else:
@@ -106,12 +118,6 @@ class BoolSearch:
         print("Total files:", file_ctr - 1)
         print("Total words:", word_ctr)
 
-
-        
-
-        
-
-
     def save_filename(self):
         with open(self.filename_path, 'w', newline='') as f:
             counter = 0
@@ -122,7 +128,6 @@ class BoolSearch:
                     if counter % 10000 == 0:
                         print(counter," files have been visited")
                     f_csv.writerow([os.path.join(root.split(self.dataset_path)[-1], file)])
-
 
 
 def main():
