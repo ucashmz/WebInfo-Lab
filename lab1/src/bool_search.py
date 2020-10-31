@@ -1,13 +1,13 @@
-import csv, os, re, linecache
+import csv, os, re, linecache, time
 from config import conf
-from nltk import word_tokenize
+from nltk import word_tokenize, sent_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 
 # TODO error handling mode
 # be used to try files in error_log again after error fixed
 
-# TODO merge inverted table
+# TODO search
 
 
 def read_file(file_path, error_log, counter):
@@ -16,31 +16,50 @@ def read_file(file_path, error_log, counter):
             content = f.read()
         except:
             with open(error_log, 'a')as log:
-                log.writelines([str(counter),",problems in ",file_path])
+                log.write(str(counter) + ",problems in " + file_path + "\n")
             print("problems in",file_path)
             return []
         paragraphs = content.split('\n\n')[1:] # discard header of the email
     return paragraphs
 
 def tokenize_paragraph(paragraph, punctuation, stops):
-    cut_word = word_tokenize(paragraph.lower())
-    word_without_punc = [word for word in cut_word if word not in punctuation and word[0]!="'" and word[0]!="_"]
+    sentences = sent_tokenize(paragraph.lower())
+    cut_word_sents = [word_tokenize(sentence) for sentence in sentences]
+    cut_word = list()
+    for cut_word_sent in cut_word_sents:
+        cut_word += cut_word_sent
+
+    for word in cut_word[:]:
+        if "." in word or "/" in word or '@' in word or '_' in word or '=' in word:
+            cut_word.remove(word)
+            cut_word += re.split(r'[./@_=]', word)
+    cut_word = list(filter(None,cut_word))
+    # print(cut_word)
+
+    word_without_punc = [word for word in cut_word if word not in punctuation and not re.match('[*=_\'-/].*',word)]
+    for i in range(len(word_without_punc)):
+        while word_without_punc[i][-1] in ['=','-','*','/','_','\'']:
+            # print(word_without_punc[i])
+            word_without_punc[i] = word_without_punc[i][:-1]
+            if not word_without_punc[i]:
+                break
+
     word_without_stops = [word for word in word_without_punc if word not in stops]
     word_without_num = [word for word in word_without_stops if not re.match('.*[0-9].*',word)]
     word_stem = [PorterStemmer().stem(word) for word in word_without_num]
-    return set(word_stem)
+    return word_stem
 
 def tokenize_file(file_path, error_log, counter):
     paragraphs = read_file(file_path, error_log, counter)
-    punctuation = set([',', '.', ':', ';', '?', '(', ')', '[', ']', '&', '!', '*', '@', '#', '$', '%','...','-','--'])
-    stops = set(stopwords.words("english")+['am','pm','ect','cc','ps'])
+    punctuation = set([',', '.', ':', ';', '?', '(', ')', '[', ']', '&', '!', '*', '@', '#', '$', '%','...','-','--','=','..'])
+    stops = set(stopwords.words("english")+['am','pm','ect','cc','ps','www','com'])
     # print(stops)
-    words = set()
+    words = list()
     for paragraph in paragraphs:
         result = tokenize_paragraph(paragraph, punctuation, stops)
-        words = words.union(result)
+        words += result
     # print(words)
-    return words
+    return set(words)
 
 class BoolSearch:
     def __init__(self, config):
@@ -62,18 +81,30 @@ class BoolSearch:
 
     def run(self):
         if os.path.exists(self.filename_path):
-            print("File name load from", self.filename_path)
+            if os.path.exists(self.inverted_table + '.csv'):
+                print("Found filename and inverted table. Start searching..")
+                self.search()
+            elif os.path.exists(self.inverted_table + str(self.get_file_num()) + '.csv'):
+                print("All files visited. Incomplete inverted tables need to be merged.")
+                self.merge_inverted_table()
+                self.search()
+            else:
+                self.get_inverted_table()
+                self.merge_inverted_table()
+                self.search()
         else:
-            self.save_filename()
-
-        if os.path.exists(self.inverted_table + ".csv"):
-            print("Inverted_table load from", self.inverted_table + ".csv")
-        else:
-            self.get_inverted_table()
+            if os.path.exists(self.inverted_table + '.csv') or self.get_inverted_table_list():
+                print("ERROR: Without filename.csv while inverted table found. You may need to delete all inverted table and start again, otherwise the result may be wrong.")
+            else:
+                self.save_filename()
+                self.get_inverted_table()
+                self.merge_inverted_table()
+                self.search()
     
     def get_inverted_table(self):
         checkpoint = self.load_checkpoint()
-        with open(self.filename_path, 'r')as f:
+        t_start = time.process_time()
+        with open(self.filename_path, 'r') as f:
             file_ctr = 0
             file_operation_ctr = 0
             filename = f.readline().split('\n')[0]
@@ -100,11 +131,17 @@ class BoolSearch:
                             word_ctr += 1
 
                     if file_ctr % 500 == 0:
-                        print(file_ctr," files have been visited")
+                        t_end = time.process_time()
+                        print(file_ctr," files have been visited, time cost:", t_end-t_start)
+                        t_start = t_end
+                        
 
                     file_operation_ctr += 1
                     file_ctr += 1
                     filename = f.readline().split('\n')[0]
+                    
+                    # if file_ctr > 1:
+                    #     return
 
                 inverted_table_path = self.inverted_table + str(file_ctr) + ".csv"
                 with open(inverted_table_path, 'w', newline='') as df:
@@ -114,9 +151,13 @@ class BoolSearch:
                 print(inverted_table_path, "has been saved.")
                 file_operation_ctr = 0 
 
+                # if file_ctr > 150000:
+                #     break
+
         print("Complete.")
-        print("Total files:", file_ctr - 1)
+        print("Total files:", file_ctr)
         print("Total words:", word_ctr)
+
 
     def save_filename(self):
         with open(self.filename_path, 'w', newline='') as f:
@@ -129,6 +170,55 @@ class BoolSearch:
                         print(counter," files have been visited")
                     f_csv.writerow([os.path.join(root.split(self.dataset_path)[-1], file)])
 
+    def get_inverted_table_list(self):
+        inverted_table_path = os.path.split(self.inverted_table)[0]
+        outputs = os.listdir(inverted_table_path)
+        inverted_tables = [output for output in outputs if re.match(os.path.split(self.inverted_table)[1]+"[0-9]+.*", output)]
+        inverted_tables_num = [int(inverted_table.split(os.path.split(self.inverted_table)[1])[-1].split(".csv")[0]) for inverted_table in inverted_tables]
+        inverted_tables_num.sort()
+        inverted_table_sorted = list()
+        for num in inverted_tables_num:
+            for inverted_table in inverted_tables:
+                if inverted_table.split(os.path.split(self.inverted_table)[1])[-1].split(".csv")[0] == str(num):
+                    inverted_table_sorted.append(inverted_table)
+                    break
+        return inverted_table_sorted
+
+    def merge_inverted_table(self):
+        inverted_tables = self.get_inverted_table_list()
+        inverted_table_merged = list()
+        word_ctr = 0
+        words = dict()
+        word_list = list()
+        for inverted_table in inverted_tables:
+            print("Merging " + inverted_table + "...")
+            path = os.path.join(os.path.split(self.inverted_table)[0], inverted_table)
+            with open(path, 'r') as f:
+                table_line = f.readline().split('\n')[0]
+                while table_line:
+                    word = table_line.split(",")[0]
+                    files_id = [int(id_str) for id_str in table_line.split(",")[1:]]
+                    if word in words:
+                        inverted_table_merged[words[word]] += files_id
+                    else:
+                        words[word] = word_ctr
+                        word_ctr += 1
+                        word_list.append(word)
+                        inverted_table_merged.append(files_id)
+                    table_line = f.readline().split('\n')[0]
+        with open(self.inverted_table + '.csv', 'w', newline='') as f:
+            f_csv = csv.writer(f)
+            for i in range(len(word_list)):
+                f_csv.writerow([word_list[i]] + inverted_table_merged[i])
+        print("Merged completed.")
+
+    def get_file_num(self):
+        with open(self.filename_path,'r') as f:
+            length = len(f.readlines())
+        return length
+
+    def search(self):
+        pass
 
 def main():
     os.chdir(conf["WORKPATH"])
@@ -137,6 +227,5 @@ def main():
     bs = BoolSearch(conf)
     bs.run()
     
-
 if __name__ == '__main__':
     main()
