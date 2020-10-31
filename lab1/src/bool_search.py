@@ -218,7 +218,47 @@ class BoolSearch:
         return length
 
     def search(self):
-        pass
+        filename = list()
+        
+
+        with open(self.filename_path, 'r') as f:
+            f_csv = csv.reader(f)
+            for line in f_csv:
+                filename.append(line[0])
+        
+        while True:
+            word_pos = 0
+            searching = input("(quit by input \'EXIT\')Search for:")
+            if searching == 'EXIT':
+                break
+            searching_stem = PorterStemmer().stem(searching.lower())
+            Found = False
+            with open(self.inverted_table + '.csv', 'r') as f:
+                table_line = f.readline().split('\n')[0]
+                while table_line:
+                    word = table_line.split(",")[0]
+                    if searching_stem == word:
+                        Found = True
+                        files_id = [int(id_str) for id_str in table_line.split(",")[1:]]
+                        break
+                    word_pos += 1
+                    if word_pos == 50000:
+                        print(word, [int(id_str) for id_str in table_line.split(",")[1:]])
+
+                    table_line = f.readline().split('\n')[0]
+
+                if not Found:
+                    print("Cannot found " + searching + " in any file.")
+                else:
+                    files = [filename[file_id] for file_id in files_id]
+                    print("Found in", len(files), "files")
+                    if len(files) > 20:
+                        print("Too much to be shown on screen..")
+                    else:
+                        for file in files:
+                            print("\t", file)
+
+
 
 def main():
     os.chdir(conf["WORKPATH"])
