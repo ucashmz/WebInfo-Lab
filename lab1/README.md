@@ -1,6 +1,8 @@
 # Lab1
 
-**!!!** You may need to install `nltk`  before getting started
+## Prerequisite
+
+You may need to install `nltk`  before getting started
 
 ```
 pip install nltk
@@ -11,7 +13,9 @@ if `nltk.download()` doesn't work, see https://blog.csdn.net/qiang12qiang12/arti
 
 
 
-**!!!** You may need to change settings in `config.py`. 
+## Guide
+
+**You may need to change settings in `config.py`. **
 
 ​	output file `filename.csv`will be saved in `filename_path` 
 
@@ -21,6 +25,16 @@ if `nltk.download()` doesn't work, see https://blog.csdn.net/qiang12qiang12/arti
 
 
 
-**!!!** Problems in `dataset\maildir\beck-s\deleted_items\`  strange chars
+**You may need to have `filename.csv` and `inverted_table.csv` before any searching**
+
+​	It could be created by the program automatically,  but it may takes a lot of time.
+
+
+
+
+
+## Problems
+
+Problems in `dataset\maildir\beck-s\deleted_items\`  strange chars
 
 Errors may be thrown out, but still need to handle fix it.
