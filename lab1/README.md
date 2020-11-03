@@ -13,9 +13,10 @@ if `nltk.download()` doesn't work, see https://blog.csdn.net/qiang12qiang12/arti
 
 
 
+
 ## Guide
 
-**You may need to change settings in `config.py`. **
+**You may need to change settings in `config.py`.**
 
 ​	output file `filename.csv`will be saved in `filename_path` 
 
