@@ -24,7 +24,7 @@ def read_file(file_path, error_log, counter):
 
 def tokenize_paragraph(paragraph, punctuation, stops):
     sentences = sent_tokenize(paragraph.lower())
-    cut_word_sents = [word_tokenize(sentence) for sentence in sentences]
+    cut_word_sents = [word_tokenize(sentence) for sentence in sentences] # Maybe this could be done without nltk
     cut_word = list()
     for cut_word_sent in cut_word_sents:
         cut_word += cut_word_sent
@@ -36,7 +36,8 @@ def tokenize_paragraph(paragraph, punctuation, stops):
     cut_word = list(filter(None,cut_word))
     # print(cut_word)
 
-    word_without_punc = [word for word in cut_word if word not in punctuation and not re.match('[*=_\'-/].*',word)]
+    # This part could be simplified
+    word_without_punc = [word for word in cut_word if word not in punctuation and not re.match('[*=_\'-/].*',word)] # to filter some words like '====='
     for i in range(len(word_without_punc)):
         while word_without_punc[i][-1] in ['=','-','*','/','_','\'']:
             # print(word_without_punc[i])
@@ -52,7 +53,7 @@ def tokenize_paragraph(paragraph, punctuation, stops):
 def tokenize_file(file_path, error_log, counter):
     paragraphs = read_file(file_path, error_log, counter)
     punctuation = set([',', '.', ':', ';', '?', '(', ')', '[', ']', '&', '!', '*', '@', '#', '$', '%','...','-','--','=','..'])
-    stops = set(stopwords.words("english")+['am','pm','ect','cc','ps','www','com'])
+    stops = set(stopwords.words("english")+['am','pm','ect','cc','ps','www','com']) # some stopwords added
     # print(stops)
     words = list()
     for paragraph in paragraphs:
@@ -83,23 +84,22 @@ class BoolSearch:
         if os.path.exists(self.filename_path):
             if os.path.exists(self.inverted_table + '.csv'):
                 print("Found filename and inverted table. Start searching..")
-                self.search()
             elif os.path.exists(self.inverted_table + str(self.get_file_num()) + '.csv'):
                 print("All files visited. Incomplete inverted tables need to be merged.")
                 self.merge_inverted_table()
-                self.search()
             else:
                 self.get_inverted_table()
                 self.merge_inverted_table()
-                self.search()
         else:
             if os.path.exists(self.inverted_table + '.csv') or self.get_inverted_table_list():
                 print("ERROR: Without filename.csv while inverted table found. You may need to delete all inverted table and start again, otherwise the result may be wrong.")
+                return
             else:
                 self.save_filename()
                 self.get_inverted_table()
                 self.merge_inverted_table()
-                self.search()
+
+        self.search()
     
     def get_inverted_table(self):
         checkpoint = self.load_checkpoint()
@@ -220,7 +220,6 @@ class BoolSearch:
     def search(self):
         filename = list()
         
-
         with open(self.filename_path, 'r') as f:
             f_csv = csv.reader(f)
             for line in f_csv:
@@ -257,8 +256,6 @@ class BoolSearch:
                     else:
                         for file in files:
                             print("\t", file)
-
-
 
 def main():
     os.chdir(conf["WORKPATH"])
