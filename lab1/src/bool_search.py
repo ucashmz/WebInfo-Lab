@@ -440,16 +440,34 @@ class BoolSearch:
         # print(words_dict)
 
         while True:
-            word_pos = 0
-            searching_word = input("(quit by input \'EXIT\')Search for:")
-            if searching_word == 'EXIT':
+            # bitmap = list()
+            searching = input("(quit by input \'EXIT\')Search for:")
+            if searching == 'EXIT':
                 break
             else:
-                result = self._search(searching_word, words_dict)
-                if len(result)>0:
-                    print("Found in", len(result), "files. First found in", filename[int(result[0])])
-                else:
-                    print("Not found.")
+                separate_search_word = searching.split()
+                for item in separate_search_stem:
+                if item == '(':
+                    pass # stack?
+                elif item == ')':
+                    pass
+                elif item == 'and':
+                    pass
+                elif item == 'or':
+                    pass
+                elif item == 'not':
+                    pass
+                else:    
+                     # tmp_index = 0
+                    files_id = self._search(item, words_dict)
+                    # for file_id in files_id:
+                    #     tmp_index += 0b1 << (file_id - 1)
+                    # bitmap.append(tmp_index)
+                    # break
+                    if len(files_id)>0:
+                        print("Found in", len(result), "files. First found in", filename[int(result[0])])
+                    else:
+                        print("Not found.")
 
 def main():
     os.chdir(conf["WORKPATH"])
