@@ -1,15 +1,12 @@
-import csv, os, re, linecache, time
+import csv, os, re, linecache, time, math, array
 from config import conf
 from nltk import word_tokenize, sent_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 
-# TODO error handling mode
-# be used to try files in error_log again after error fixed
-
-# TODO search
-
-
+'''
+Used to read mail data. return paragraphs without heading
+'''
 def read_file(file_path, error_log, counter):
     with open(file_path,'r',encoding='utf-8') as f:
         try:
@@ -22,57 +19,119 @@ def read_file(file_path, error_log, counter):
         paragraphs = content.split('\n\n')[1:] # discard header of the email
     return paragraphs
 
-def tokenize_paragraph(paragraph, punctuation, stops):
-    sentences = sent_tokenize(paragraph.lower())
-    cut_word_sents = [word_tokenize(sentence) for sentence in sentences] # Maybe this could be done without nltk
-    cut_word = list()
-    for cut_word_sent in cut_word_sents:
-        cut_word += cut_word_sent
-
-    for word in cut_word[:]:
-        if "." in word or "/" in word or '@' in word or '_' in word or '=' in word:
-            cut_word.remove(word)
-            cut_word += re.split(r'[./@_=]', word)
-    cut_word = list(filter(None,cut_word))
-    # print(cut_word)
-
-    # This part could be simplified
-    word_without_punc = [word for word in cut_word if word not in punctuation and not re.match('[*=_\'-/].*',word)] # to filter some words like '====='
-    for i in range(len(word_without_punc)):
-        while word_without_punc[i][-1] in ['=','-','*','/','_','\'']:
-            # print(word_without_punc[i])
-            word_without_punc[i] = word_without_punc[i][:-1]
-            if not word_without_punc[i]:
-                break
-
-    word_without_stops = [word for word in word_without_punc if word not in stops]
-    word_without_num = [word for word in word_without_stops if not re.match('.*[0-9].*',word)]
-    word_stem = [PorterStemmer().stem(word) for word in word_without_num]
+'''
+Get words in a paragraph, No numbers, punctuations, stopwords in words.
+Cache (type:dict()) is used to reduce time cost during getting word's stem.
+Cache[original-word] = word's-stem
+Return a list of words
+'''
+def tokenize_paragraph(paragraph, stops, cache):
+    cut_word_without_num = re.split(r'[\t\n !\"#$%&\'()*+,-./0123456789:;<=>?@\[\]_~]', paragraph.lower())
+    word_without_stops = [word for word in cut_word_without_num if word not in stops and len(word) > 1]
+    # word_without_num = [word for word in word_without_stops if not re.match('.*[0-9].*',word)]
+    word_stem = list()
+    for word in word_without_stops:
+        if word not in cache:
+            cache[word] = PorterStemmer().stem(word)
+        word_stem.append(cache[word])
     return word_stem
 
-def tokenize_file(file_path, error_log, counter):
+'''
+Define some stopwords
+Cache used for tokenize_paragraph().
+Return a list of words occur in the file
+'''
+def tokenize_file(file_path, error_log, counter, cache):
     paragraphs = read_file(file_path, error_log, counter)
-    punctuation = set([',', '.', ':', ';', '?', '(', ')', '[', ']', '&', '!', '*', '@', '#', '$', '%','...','-','--','=','..'])
-    stops = set(stopwords.words("english")+['am','pm','ect','cc','ps','www','com']) # some stopwords added
+    stops = set(stopwords.words("english")+['am','pm','ect','cc','ps','www','com','re']) # some stopwords added
     # print(stops)
     words = list()
     for paragraph in paragraphs:
-        result = tokenize_paragraph(paragraph, punctuation, stops)
+        result = tokenize_paragraph(paragraph, stops, cache)
         words += result
     # print(words)
-    return set(words)
+    return words
+
+'''
+Limit: a set of words that need to be considered. For example, first 1000 words most frequently occured in all files.
+Cache used for tokenize_paragraph().
+Words_tf[word] = tf_value of the word
+Return a dictionary
+'''
+def get_tf(file_path, error_log, counter, cache, limit):
+    words_in_file = tokenize_file(file_path, error_log, counter, cache)
+    words_tf = dict.fromkeys(limit, 0)
+    for word in words_in_file:
+        if word in limit:
+            words_tf[word] += 1
+    for word in limit:
+        if words_tf[word] > 0:
+            words_tf[word] = float('%.03f'%(1 + math.log(words_tf[word], 10)))
+    return words_tf
+
+    
 
 class BoolSearch:
     def __init__(self, config):
         self.dataset_path = config['dataset_path']
         self.filename_path = config['filename_path']
         self.inverted_table = config['inverted_table']
+        self.tf_table = config['tf_table']
         self.checkpoint = config['checkpoint']
         self.error_log = config['error_log']
-    
+        self.words_list = config['words_list']
+        self.tfidf_table_path = config['tfidf_table_path']
+
+    '''
+    Do initialization.
+    These files will exist after initialization:
+        filename        - All files' name saved in the file. Inverted table and tfidf table are based on this file.
+        words_list      - A file with first 1000 words most frequently occured in all files. Organized as "words, occur-times". Sorted.
+                          tfidf vector is calculated base on this file.
+        inverted_table  - Merged by small fragments(checkpoints).
+        tfidf_table     - Merged by small tf-table fragments(checkpoints). Need inverted_table to calculate tfidf vector.
+    '''
+    def init(self):
+        if not (os.path.exists(self.filename_path) and os.path.exists(self.words_list)):
+            if os.path.exists(self.inverted_table + '.csv') or os.path.exists(self.tfidf_table_path) or self.get_inverted_table_list or self.get_tf_table_list:
+                print("ERROR: Without filename or words_list, but inverted_table or tfidf_table found.")
+                print("       Remove inverted_table and tfidf_table first and restart.")
+                return
+            else:
+                if not os.path.exists(self.filename_path):
+                    print("Get filenames list")
+                    self.save_filename()
+                if not os.path.exists(self.words_list):
+                    print("Counting words.. Need to get a list of first 1000 of most frequently occured words")
+                    self.words_counting()
+        print("filename and words list found.")
+
+        self.file_num = self.get_file_num()
+        self.words_list_sorted = self.load_words_list()
+
+        if not os.path.exists(self.inverted_table + '.csv'):
+            if not os.path.exists(self.inverted_table + str(self.file_num) + '.csv'):
+                self.get_inverted_table_and_tf_table() # Generate small fragments of inverted_table and tf_table
+            self.merge_inverted_table()
+        if not os.path.exists(self.tfidf_table_path):
+            if not os.path.exists(self.tf_table + str(self.file_num) + '.csv'):
+                self.get_inverted_table_and_tf_table() # Generate small fragments of inverted_table and tf_table
+            self.word_occurence = self.get_word_occurence() # Used to calculate tfidf vector
+            self.get_tfidf_table()
+        print("Initialization Complete.")
+            
+    def run(self):
+        self.init()
+        self.search()
+
+    '''
+    For inverted_table and tf_table 's generation.
+    Fragments saved every $checkpoint files.
+    This function is used to get where to continue the process, return an int.
+    '''
     def load_checkpoint(self):
         i = 0
-        while (os.path.exists(self.inverted_table + str(i + self.checkpoint) + ".csv")):
+        while (os.path.exists(self.inverted_table + str(i + self.checkpoint) + ".csv") and os.path.exists(self.tf_table + str(i + self.checkpoint) + ".csv")):
             i += self.checkpoint
         if i!=0:
             print("Load from checkpoint", i)
@@ -80,28 +139,25 @@ class BoolSearch:
             print("Start without checkpoint.")
         return i
 
-    def run(self):
-        if os.path.exists(self.filename_path):
-            if os.path.exists(self.inverted_table + '.csv'):
-                print("Found filename and inverted table. Start searching..")
-            elif os.path.exists(self.inverted_table + str(self.get_file_num()) + '.csv'):
-                print("All files visited. Incomplete inverted tables need to be merged.")
-                self.merge_inverted_table()
-            else:
-                self.get_inverted_table()
-                self.merge_inverted_table()
-        else:
-            if os.path.exists(self.inverted_table + '.csv') or self.get_inverted_table_list():
-                print("ERROR: Without filename.csv while inverted table found. You may need to delete all inverted table and start again, otherwise the result may be wrong.")
-                return
-            else:
-                self.save_filename()
-                self.get_inverted_table()
-                self.merge_inverted_table()
+    '''
+    To get words in words_list.
+    Return a list, in which words are sorted by times they occur in all files.
+    tfidf vector is calculated base on this list. 
+    '''
+    def load_words_list(self):
+        words = list()
+        with open(self.words_list, 'r') as f:
+            table_line = f.readline().split('\n')[0]
+            while table_line:
+                words.append(table_line.split(",")[0])
+                table_line = f.readline().split('\n')[0]
+        # print(words)
+        return words
+        
 
-        self.search()
-    
-    def get_inverted_table(self):
+    def get_inverted_table_and_tf_table(self):
+        cache = dict() # Used to speed up tokenize process
+        words_list = set(self.words_list_sorted) # To reduce finding time, use set to save words list here. The set is NOT sorted
         checkpoint = self.load_checkpoint()
         t_start = time.process_time()
         with open(self.filename_path, 'r') as f:
@@ -109,56 +165,119 @@ class BoolSearch:
             file_operation_ctr = 0
             filename = f.readline().split('\n')[0]
             while filename:
-                words = dict() # key=word value=index, use dict to reduce time complexity of finding word
-                word_list = list() # [word1,word2,...] use word_list to get word by index
-                inverted_table = list() # inverted_table[i] = [file_id for file if word_list[i] appears in file]
-                word_ctr = 0
-                while file_operation_ctr < self.checkpoint and filename: # save checkpoint 
+                '''
+                Inverted_table[word] = [files_id]
+                A new table for every $checkpoint files
+                '''
+                inverted_table = dict() 
+                for word in words_list:
+                    inverted_table[word] = []
+                '''
+                tf_table = [[tf-vector of file 1] .. [tf-vector of file n]]
+                A new table for every $checkpoint files
+                '''
+                tf_table = list() 
+                while file_operation_ctr < self.checkpoint and filename: # get to checkpoint 
                     if file_ctr < checkpoint:
                         file_ctr += 1
                         filename = f.readline().split('\n')[0]
                         continue
 
                     file_path = os.path.join(self.dataset_path, filename)
-                    # print(file_path)
-                    for word in tokenize_file(file_path, self.error_log, file_ctr):
-                        if word in words:
-                            inverted_table[words[word]].append(file_ctr)
-                        else:
-                            words[word] = word_ctr
-                            word_list.append(word)
-                            inverted_table.append([file_ctr])
-                            word_ctr += 1
 
-                    if file_ctr % 500 == 0:
-                        t_end = time.process_time()
-                        print(file_ctr," files have been visited, time cost:", t_end-t_start)
-                        t_start = t_end
-                        
+                    words_tf = get_tf(file_path, self.error_log, file_ctr, cache, words_list)  
+                    words_tf_sorted = [words_tf[word] for word in self.words_list_sorted] # get tf vector of a word
+                    tf_table.append(words_tf_sorted) 
+
+                    for key in words_tf.keys():
+                        if words_tf[key] > 0: # which means the word occur in the file
+                            inverted_table[key].append(file_ctr)
 
                     file_operation_ctr += 1
                     file_ctr += 1
+
+                    if file_ctr % 1000 == 0:
+                        t_end = time.process_time()
+                        print(file_ctr," files have been visited, time cost:", t_end-t_start)
+                        print("Cache length:",len(cache))
+                        t_start = t_end
+
                     filename = f.readline().split('\n')[0]
                     
                     # if file_ctr > 1:
                     #     return
-
+            
                 inverted_table_path = self.inverted_table + str(file_ctr) + ".csv"
                 with open(inverted_table_path, 'w', newline='') as df:
                     f_csv = csv.writer(df)
-                    for i in range(len(word_list)):
-                        f_csv.writerow([word_list[i]] + inverted_table[i])
+                    for key in inverted_table.keys():
+                        f_csv.writerow([key]+inverted_table[key])
                 print(inverted_table_path, "has been saved.")
-                file_operation_ctr = 0 
 
-                # if file_ctr > 150000:
-                #     break
+                '''
+                To use less space, for every file, the tf vector is saved in this way:
+                    if the i th component of the vector is 0, skip
+                    else append i and vector[i] to the row in sequence.
+                '''
+                tf_table_path = self.tf_table + str(file_ctr) + ".csv"
+                with open(tf_table_path, 'w', newline='') as df:
+                    f_csv = csv.writer(df)
+                    for i in range(len(tf_table)):
+                        temp = list()
+                        for j in range(len(tf_table[i])):
+                            if tf_table[i][j]>0:
+                                temp.append(j)
+                                temp.append(tf_table[i][j])
+                        f_csv.writerow(temp)
+
+                print(tf_table_path, "has been saved.")
+
+                file_operation_ctr = 0 
 
         print("Complete.")
         print("Total files:", file_ctr)
-        print("Total words:", word_ctr)
+    
+    def words_counting(self):
+        cache = dict() # Used to speed up tokenize process
+        words = dict() # words[word] = occur-time
+        t_start = time.process_time()
+        with open(self.filename_path, 'r') as f:
+            file_ctr = 0
+            filename = f.readline().split('\n')[0]
+            while filename:
+                file_ctr += 1
+                file_path = os.path.join(self.dataset_path, filename)
+                words_in_file = tokenize_file(file_path, self.error_log, file_ctr, cache) # words_in_file[word] = occur-time in file
+                for word in words_in_file:
+                    if word in words:
+                        words[word] += 1
+                    else:
+                        words[word] = 1
 
+                if file_ctr % 1000 == 0:
+                    t_end = time.process_time()
+                    print(file_ctr," files have been visited, time cost:", t_end-t_start)
+                    print("Cache length:",len(cache))
+                    t_start = t_end
 
+                filename = f.readline().split('\n')[0]
+            
+        result = sorted(words.items(), key = lambda item:item[1], reverse = True)[:1000]       
+        
+        with open(self.words_list, 'w', newline='') as df:
+            f_csv = csv.writer(df)
+            for i in range(len(result)):
+                f_csv.writerow(list(result[i]))
+        print(self.words_list, "has been saved.")
+
+        print("Complete.")
+        print("Total files:", file_ctr)
+        print("Total words:", len(words))
+
+    '''
+    Walk dataset_path, save the order in filename.csv
+    Used in all following process
+    '''
     def save_filename(self):
         with open(self.filename_path, 'w', newline='') as f:
             counter = 0
@@ -170,6 +289,9 @@ class BoolSearch:
                         print(counter," files have been visited")
                     f_csv.writerow([os.path.join(root.split(self.dataset_path)[-1], file)])
 
+    '''
+    Get the filename of all inverted_table's checkpoints
+    '''
     def get_inverted_table_list(self):
         inverted_table_path = os.path.split(self.inverted_table)[0]
         outputs = os.listdir(inverted_table_path)
@@ -184,12 +306,29 @@ class BoolSearch:
                     break
         return inverted_table_sorted
 
+    '''
+    Get the filename of all tf_table's checkpoints
+    '''
+    def get_tf_table_list(self):
+        tf_table_path = os.path.split(self.tf_table)[0]
+        outputs = os.listdir(tf_table_path)
+        tf_tables = [output for output in outputs if re.match(os.path.split(self.tf_table)[1]+"[0-9]+.*", output)]
+        tf_tables_num = [int(tf_table.split(os.path.split(self.tf_table)[1])[-1].split(".csv")[0]) for tf_table in tf_tables]
+        tf_tables_num.sort()
+        tf_table_sorted = list()
+        for num in tf_tables_num:
+            for tf_table in tf_tables:
+                if tf_table.split(os.path.split(self.tf_table)[1])[-1].split(".csv")[0] == str(num):
+                    tf_table_sorted.append(tf_table)
+                    break
+        return tf_table_sorted
+
+    '''
+    Merge all fragments of inverted_table
+    '''
     def merge_inverted_table(self):
         inverted_tables = self.get_inverted_table_list()
-        inverted_table_merged = list()
-        word_ctr = 0
-        words = dict()
-        word_list = list()
+        inverted_table_merged = dict()
         for inverted_table in inverted_tables:
             print("Merging " + inverted_table + "...")
             path = os.path.join(os.path.split(self.inverted_table)[0], inverted_table)
@@ -198,69 +337,122 @@ class BoolSearch:
                 while table_line:
                     word = table_line.split(",")[0]
                     files_id = [int(id_str) for id_str in table_line.split(",")[1:]]
-                    if word in words:
-                        inverted_table_merged[words[word]] += files_id
+                    if word in inverted_table_merged:
+                        inverted_table_merged[word] += files_id
                     else:
-                        words[word] = word_ctr
-                        word_ctr += 1
-                        word_list.append(word)
-                        inverted_table_merged.append(files_id)
+                        inverted_table_merged[word] = files_id
                     table_line = f.readline().split('\n')[0]
         with open(self.inverted_table + '.csv', 'w', newline='') as f:
             f_csv = csv.writer(f)
-            for i in range(len(word_list)):
-                f_csv.writerow([word_list[i]] + inverted_table_merged[i])
-        print("Merged completed.")
+            for key in inverted_table_merged.keys():
+                f_csv.writerow([key] + inverted_table_merged[key])
 
+        print("Merging completed.")
+    
+    '''
+    Read inverted_table, for every word, get number of files in which word occurs in.
+    Use words_list_sorted to arrange it.
+    This will be used in calculating tfidf-vector
+    '''
+    def get_word_occurence(self):
+        word_occurence_dict = dict()
+        with open(self.inverted_table + '.csv', 'r', newline='') as f:
+            table_line = f.readline().split('\n')[0]
+            while table_line:
+                word = table_line.split(",")[0]
+                files_id = [int(id_str) for id_str in table_line.split(",")[1:]]
+                word_occurence_dict[word] = len(files_id)
+                table_line = f.readline().split('\n')[0]
+        word_occurence = [word_occurence_dict[word] for word in self.words_list_sorted]
+        return word_occurence
+
+    '''
+    To use less space, for every file, the tf vector is saved in this way:
+        if the i th component of the vector is 0, skip
+        else append i and vector[i] to the row in sequence.
+
+    Tfidf vector is also saved in this way.
+    Need to calculate tfidf vector using tf vector and idf vector in this function
+    '''
+    def get_tfidf_table(self):
+        tf_tables = self.get_tf_table_list()
+
+        with open(self.tfidf_table_path, 'w', newline='') as df:
+            f_csv = csv.writer(df)
+            for tf_table in tf_tables:
+                print("Merging " + tf_table + "...")
+                path = os.path.join(os.path.split(self.tf_table)[0], tf_table)
+                with open(path, 'r') as f:             
+                    table_line = f.readline()
+                    while table_line:
+                        tfidf_table = list()
+                        data = table_line.split("\n")[0].split(",")
+                        for i in range(len(data)//2):
+                            tfidf_table.append(data[2*i])
+                            tfidf = float('%.03f'%(float(data[2*i+1]) * math.log(self.file_num / self.word_occurence[int(data[2*i])], 10)))
+                            tfidf_table.append(tfidf)
+                        f_csv.writerow(tfidf_table)
+                        table_line = f.readline()
+            
+            print("Merging completed.")
+
+    '''
+    Return the number of all files
+    ''' 
     def get_file_num(self):
         with open(self.filename_path,'r') as f:
             length = len(f.readlines())
         return length
 
+    '''
+    Search a word.
+    Words_dict is organized as: words_dict[word] = i, while i is the line of the word in inverted table
+    Return a list of files_id in which the word occurs
+    ''' 
+    def _search(self, searching_word, words_dict):
+        searching_stem = PorterStemmer().stem(searching_word.lower())
+        if searching_stem in words_dict:
+            result = linecache.getline(self.inverted_table + '.csv', words_dict[searching_stem]).split(',')[1:]   
+            linecache.clearcache()             
+        else:
+            result = []
+        return result
+
+
     def search(self):
         filename = list()
-        
+        words_dict = dict()
         with open(self.filename_path, 'r') as f:
-            f_csv = csv.reader(f)
-            for line in f_csv:
-                filename.append(line[0])
-        
+            filename = f.readlines()
+        print("Loading inverted table..")
+
+        '''
+        load words_dict from inverted_table
+        '''
+        with open(self.inverted_table + '.csv', 'r') as f:
+            table_line = f.readline().split('\n')[0]
+            ctr = 1
+            while table_line:
+                word = table_line.split(",")[0]
+                words_dict[word] = ctr
+                ctr += 1
+                table_line = f.readline().split('\n')[0]
+        # print(words_dict)
+
         while True:
             word_pos = 0
-            searching = input("(quit by input \'EXIT\')Search for:")
-            if searching == 'EXIT':
+            searching_word = input("(quit by input \'EXIT\')Search for:")
+            if searching_word == 'EXIT':
                 break
-            searching_stem = PorterStemmer().stem(searching.lower())
-            Found = False
-            with open(self.inverted_table + '.csv', 'r') as f:
-                table_line = f.readline().split('\n')[0]
-                while table_line:
-                    word = table_line.split(",")[0]
-                    if searching_stem == word:
-                        Found = True
-                        files_id = [int(id_str) for id_str in table_line.split(",")[1:]]
-                        break
-                    word_pos += 1
-                    if word_pos == 50000:
-                        print(word, [int(id_str) for id_str in table_line.split(",")[1:]])
-
-                    table_line = f.readline().split('\n')[0]
-
-                if not Found:
-                    print("Cannot found " + searching + " in any file.")
+            else:
+                result = self._search(searching_word, words_dict)
+                if len(result)>0:
+                    print("Found in", len(result), "files. First found in", filename[int(result[0])])
                 else:
-                    files = [filename[file_id] for file_id in files_id]
-                    print("Found in", len(files), "files")
-                    if len(files) > 20:
-                        print("Too much to be shown on screen..")
-                    else:
-                        for file in files:
-                            print("\t", file)
+                    print("Not found.")
 
 def main():
     os.chdir(conf["WORKPATH"])
-    print("dataset:",conf["dataset_path"])
-    print("filename_path:",conf["filename_path"])
     bs = BoolSearch(conf)
     bs.run()
     
