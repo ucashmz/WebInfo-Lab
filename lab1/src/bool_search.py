@@ -1,6 +1,6 @@
-import csv, os, re, linecache, time, math, array
+import csv, os, re, linecache, time, math
+import numpy as np
 from config import conf
-from nltk import word_tokenize, sent_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 
@@ -69,7 +69,12 @@ def get_tf(file_path, error_log, counter, cache, limit):
             words_tf[word] = float('%.03f'%(1 + math.log(words_tf[word], 10)))
     return words_tf
 
-    
+def vector_normalize(vector):
+    len = np.sqrt(np.sum(np.square(vector)))
+    if len == 0:
+        return vector
+    else:
+        return vector/len
 
 class BoolSearch:
     def __init__(self, config):
@@ -113,16 +118,18 @@ class BoolSearch:
             if not os.path.exists(self.inverted_table + str(self.file_num) + '.csv'):
                 self.get_inverted_table_and_tf_table() # Generate small fragments of inverted_table and tf_table
             self.merge_inverted_table()
+
+        self.word_occurence = self.get_word_occurence() # Used to calculate tfidf vector
+
         if not os.path.exists(self.tfidf_table_path):
             if not os.path.exists(self.tf_table + str(self.file_num) + '.csv'):
                 self.get_inverted_table_and_tf_table() # Generate small fragments of inverted_table and tf_table
-            self.word_occurence = self.get_word_occurence() # Used to calculate tfidf vector
             self.get_tfidf_table()
         print("Initialization Complete.")
             
     def run(self):
         self.init()
-        self.search()
+        self.tfidf_search()
 
     '''
     For inverted_table and tf_table 's generation.
@@ -360,7 +367,7 @@ class BoolSearch:
             table_line = f.readline().split('\n')[0]
             while table_line:
                 word = table_line.split(",")[0]
-                files_id = [int(id_str) for id_str in table_line.split(",")[1:]]
+                files_id = [table_line.split(",")[1:]]
                 word_occurence_dict[word] = len(files_id)
                 table_line = f.readline().split('\n')[0]
         word_occurence = [word_occurence_dict[word] for word in self.words_list_sorted]
@@ -373,6 +380,8 @@ class BoolSearch:
 
     Tfidf vector is also saved in this way.
     Need to calculate tfidf vector using tf vector and idf vector in this function
+
+    Tfidf vector is not normalized in thid table!!!
     '''
     def get_tfidf_table(self):
         tf_tables = self.get_tf_table_list()
@@ -403,6 +412,76 @@ class BoolSearch:
         with open(self.filename_path,'r') as f:
             length = len(f.readlines())
         return length
+
+
+    def get_tfidf_vector(self, searching_words):
+        limit = set(self.words_list_sorted)
+        words_dict = dict()
+        words_tf = dict.fromkeys(limit,0)
+        for i in range(len(self.words_list_sorted)):
+            words_dict[self.words_list_sorted[i]] = i
+
+        tfidf_vector = []
+        for searching_word in searching_words:
+            searching_word = PorterStemmer().stem(searching_word.lower())
+            if searching_word in limit:
+                if searching_word in words_tf:
+                    words_tf[searching_word] += 1
+                else:
+                    words_tf[searching_word] = 1
+
+        for word in words_tf.keys():
+            if words_tf[word]:
+                words_tf[word] = (1 + math.log(words_tf[word], 10))*math.log(self.file_num / self.word_occurence[int(words_dict[word])], 10)
+
+        for word in self.words_list_sorted:
+            tfidf_vector.append(words_tf[word])
+        return np.array(tfidf_vector)
+
+    def _tfidf_search(self, searching_words):
+        tfidf_vector = self.get_tfidf_vector(searching_words)
+        # print(len(tfidf_vector))
+
+        result = []
+        with open(self.tfidf_table_path, 'r') as f:
+            table_line = f.readline()
+            ctr = 0
+            while table_line:
+                data = table_line.split("\n")[0].split(",") # data: [..., i, i.tfidf_value, ...]
+                file_tfidf_vector = np.zeros(len(self.words_list_sorted))
+                for i in range(len(data)//2):
+                    file_tfidf_vector[int(data[i*2])] = float(data[2*i+1])
+                # print(len(file_tfidf_vector))
+                dist = np.sqrt(np.sum(np.square(vector_normalize(tfidf_vector) - vector_normalize(file_tfidf_vector))))
+                result.append((ctr, dist))
+                ctr += 1
+                if ctr%20000 == 0:
+                    print(ctr, "files have been visited")
+                table_line = f.readline()
+                # print(result)
+        print()
+        result = [file[0] for file in sorted(result, key = lambda x:x[1])[:10]]
+        return result
+
+    def tfidf_search(self):
+        filename = list()
+        with open(self.filename_path, 'r') as f:
+            filename = f.readlines()
+        
+        while True:
+            # bitmap = list()
+            searching = input("(quit by input \'EXIT\')Search for:")
+            if searching == 'EXIT':
+                break
+            else:
+                separate_search_word = searching.split()
+                files_id = self._tfidf_search(separate_search_word)
+                print("Most related files:")
+                for file_id in files_id:
+                    print("\t", filename[file_id])
+
+                
+
 
     '''
     Search a word.
@@ -446,28 +525,28 @@ class BoolSearch:
                 break
             else:
                 separate_search_word = searching.split()
-                for item in separate_search_stem:
-                if item == '(':
-                    pass # stack?
-                elif item == ')':
-                    pass
-                elif item == 'and':
-                    pass
-                elif item == 'or':
-                    pass
-                elif item == 'not':
-                    pass
-                else:    
-                     # tmp_index = 0
-                    files_id = self._search(item, words_dict)
-                    # for file_id in files_id:
-                    #     tmp_index += 0b1 << (file_id - 1)
-                    # bitmap.append(tmp_index)
-                    # break
-                    if len(files_id)>0:
-                        print("Found in", len(result), "files. First found in", filename[int(result[0])])
-                    else:
-                        print("Not found.")
+                for item in separate_search_word:
+                    if item == '(':
+                        pass # stack?
+                    elif item == ')':
+                        pass
+                    elif item == 'and':
+                        pass
+                    elif item == 'or':
+                        pass
+                    elif item == 'not':
+                        pass
+                    else:    
+                        # tmp_index = 0
+                        files_id = self._search(item, words_dict)
+                        # for file_id in files_id:
+                        #     tmp_index += 0b1 << (file_id - 1)
+                        # bitmap.append(tmp_index)
+                        # break
+                        if len(files_id)>0:
+                            print("Found in", len(result), "files. First found in", filename[int(result[0])])
+                        else:
+                            print("Not found.")
 
 def main():
     os.chdir(conf["WORKPATH"])
