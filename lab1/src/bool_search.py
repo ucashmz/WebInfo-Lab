@@ -413,7 +413,10 @@ class BoolSearch:
             length = len(f.readlines())
         return length
 
-
+    '''
+    For a list of words, get its tfidf_vector
+    The result is not normalized yet!
+    '''
     def get_tfidf_vector(self, searching_words):
         limit = set(self.words_list_sorted)
         words_dict = dict()
@@ -438,6 +441,9 @@ class BoolSearch:
             tfidf_vector.append(words_tf[word])
         return np.array(tfidf_vector)
 
+    '''
+    Return first 10 files most related to searching words
+    '''
     def _tfidf_search(self, searching_words):
         tfidf_vector = self.get_tfidf_vector(searching_words)
         # print(len(tfidf_vector))
