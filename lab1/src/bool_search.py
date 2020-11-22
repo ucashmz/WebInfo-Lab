@@ -76,7 +76,7 @@ def vector_normalize(vector):
     else:
         return vector/len
 
-class BoolSearch:
+class Searcher:
     def __init__(self, config):
         self.dataset_path = config['dataset_path']
         self.filename_path = config['filename_path']
@@ -129,7 +129,24 @@ class BoolSearch:
             
     def run(self):
         self.init()
-        self.tfidf_search()
+        print("1. gen inverted_table")
+        print("2. bool search")
+        print("3. gen tfidf_table")
+        print("4. tfidf search")
+        print("Else exit.")
+        index = input()
+        if index == '1':
+            self.get_tfidf_table()
+            pass
+        elif index == '2':
+            self.search()
+            pass
+        elif index == '3':
+            self.get_tfidf_table()
+            pass
+        elif index == '4':
+            self.tfidf_search()
+            pass
 
     '''
     For inverted_table and tf_table 's generation.
@@ -556,8 +573,8 @@ class BoolSearch:
 
 def main():
     os.chdir(conf["WORKPATH"])
-    bs = BoolSearch(conf)
-    bs.run()
+    searcher = Searcher(conf)
+    searcher.run()
     
 if __name__ == '__main__':
     main()
