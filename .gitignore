@@ -5,6 +5,7 @@ lab1/dataset/
 lab1/output/*
 
 #pycache
-lab1/src/__pycache__/*
+__pycache__
 
-
+lab1/src/config.py
+.vscode
