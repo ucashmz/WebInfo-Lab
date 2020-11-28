@@ -8,6 +8,7 @@ import numpy as np
 from config import conf
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
+from lepl import *
 
 '''
 Used to read mail data. return paragraphs without heading
@@ -31,15 +32,14 @@ def op_or(a, b):
     return list(set(a + b))
 
 
-def op_and(a, b):
-    seen = set()
-    duplicated = set()
-    for x in a+b:
-        if x not in seen:
-            seen.add(x)
-        else:
-            duplicated.add(x)
-    return list(duplicated)
+
+
+
+def ander(result):
+    if len(result) == 2:
+        return (result[0], result[1])
+    return result[0]
+
 
 '''
 class Node(object):
@@ -606,6 +606,25 @@ class Searcher:
             result = []
         return result
 
+    def op_and(self, a, b, words_dict): # list
+        seen = set()
+        duplicated = set()
+
+        if type(b) is tuple: # (x, (x, (x, x)))
+            b = self.op_and(b[0], b[1], words_dict)
+        # print(b)
+        # print(list(a)+list(b))
+        a = self._search(a, words_dict)
+        if type(b) is not list:
+            b = self._search(b, words_dict)
+        for x in a+b:
+            # print(x)
+            if x not in seen:
+                seen.add(x)
+            else:
+                duplicated.add(x)
+        return list(duplicated)
+
     def search(self):
         filename = list()
         words_dict = dict()
@@ -632,57 +651,45 @@ class Searcher:
             if searching == 'EXIT':
                 break
             else:
-                searching_words = searching.split()
-                size = len(searching_words)
-                op = list()
-                items = list()
-
-                for item in searching_words:
-                    if item == '(':
-                        op.append(item)
-                        pass
-                    elif item == ')':
-                        op.append(item)
-                        pass
-                    elif item == 'and':
-                        op.append(item)
-                        pass
-                    elif item == 'or':
-                        op.append(item)
-                        pass
-                    elif item == 'not':
-                        op.append(item)
-                        pass
-                    else:
-                        files_id = self._search(item, words_dict)
-                        tmp_index = list()
-                        for file_id in files_id:
-                            tmp_index.append(file_id)
-                        items.append(tmp_index)
-                
-                item_index = 0
-                op_index = 0
-
+                text = String() | Word()
+                andClausePrime = Delayed()
+                label = text & Drop(':')
+                with DroppedSpace():
+                    parameter = label & text > (lambda r: {r[0]: r[1]})
+                    andClause = (parameter | text) & andClausePrime > ander
+                    andClausePrime += (Drop('AND') & (andClause | parameter | text) & andClausePrime)[:]
+                    expr = andClause | parameter | text
+                    query = expr & (Drop('OR') & expr)[:]
                 '''
-                if op[op_index] == '(':
-                    op_index += 1
-                elif op[op_index] == ')':
-                    pass
-                elif op[op_index] == 'and':
-                    pass
-                elif op[op_index] == 'or':
-                    pass
-                elif op[op_index] == 'not':
-                    pass
+                    files_id = self._search(item, words_dict)
+                    tmp_index = list()
+                    for file_id in files_id:
+                        tmp_index.append(file_id)
+                    items.append(tmp_index)
                 '''
 
+                query_parsed = query.parse(searching)
+                exist_list = list()
+                for item in query_parsed:
+                    if type(item) is tuple: # tuple and list mixup
+                        exist_list += self.op_and(item[0], item[1], words_dict)
+                        pass
+                    '''
+                    if type(item) is list:
+                        exist_list += item
+                        pass
+                    if type(item) is int:
+                        exist_list.append(item)
+                        pass
+                    '''
+                    exist_list += self._search(item, words_dict)
+                result = list(set(exist_list))
 
-                '''
-                if len(files_id) > 0:
+                if len(result) > 0:
                     print("Found in", len(result), "files. First found in", filename[int(result[0])])
                 else:
                     print("Not found.")
-                '''
+
 
 def main():
     os.chdir(conf["WORKPATH"])
