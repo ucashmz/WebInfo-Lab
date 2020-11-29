@@ -606,19 +606,21 @@ class Searcher:
             result = []
         return result
 
-    def op_and(self, a, b, words_dict): # list
+    def op_and(self, a, b, words_dict): # query word
         seen = set()
         duplicated = set()
 
         if type(b) is tuple: # (x, (x, (x, x)))
             b = self.op_and(b[0], b[1], words_dict)
-        # print(b)
-        # print(list(a)+list(b))
-        a = self._search(a, words_dict)
+        if type(a) is not list:
+            a_list = self._search(a, words_dict)
+        else:
+            a_list = a
         if type(b) is not list:
-            b = self._search(b, words_dict)
-        for x in a+b:
-            # print(x)
+            b_list = self._search(b, words_dict)
+        else:
+            b_list = b
+        for x in a_list+b_list:
             if x not in seen:
                 seen.add(x)
             else:
@@ -660,19 +662,13 @@ class Searcher:
                     andClausePrime += (Drop('AND') & (andClause | parameter | text) & andClausePrime)[:]
                     expr = andClause | parameter | text
                     query = expr & (Drop('OR') & expr)[:]
-                '''
-                    files_id = self._search(item, words_dict)
-                    tmp_index = list()
-                    for file_id in files_id:
-                        tmp_index.append(file_id)
-                    items.append(tmp_index)
-                '''
 
                 query_parsed = query.parse(searching)
                 exist_list = list()
                 for item in query_parsed:
                     if type(item) is tuple: # tuple and list mixup
                         exist_list += self.op_and(item[0], item[1], words_dict)
+                        print(self.op_and(item[0], item[1], words_dict))
                         pass
                     '''
                     if type(item) is list:
@@ -682,8 +678,12 @@ class Searcher:
                         exist_list.append(item)
                         pass
                     '''
-                    exist_list += self._search(item, words_dict)
+                    if type(item) is list:
+                        print(self._search(item, words_dict))
+                        exist_list += self._search(item, words_dict)
+                        pass
                 result = list(set(exist_list))
+                print(len(result))
 
                 if len(result) > 0:
                     print("Found in", len(result), "files. First found in", filename[int(result[0])])
