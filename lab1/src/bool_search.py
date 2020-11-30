@@ -1,4 +1,5 @@
 import csv
+import sys
 import os
 import re
 import linecache
@@ -8,7 +9,6 @@ import numpy as np
 from config import conf
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
-from lepl import *
 
 '''
 Used to read mail data. return paragraphs without heading
@@ -27,34 +27,66 @@ def read_file(file_path, error_log, counter):
         paragraphs = content.split('\n\n')[1:]  # discard header of the email
     return paragraphs
 
+def isOP(ch):
+    if ch == "AND" or ch == "OR" or ch == "NOT":
+        return True
+    elif ch == "(" or ch == ")" or ch == "#":
+        return True
+    else:
+        return False
+
+def precede(a, b):
+    if b == "AND":
+        if a == "OR" or a == "#" or a == "(":
+            return '<'
+        elif a == "AND" or a == ")":
+            return '>'
+    elif b == "OR":
+        if a == "#" or a == "(":
+            return '<'
+        elif a == ")" or a == "OR" or a == "AND":
+            return '>'
+    elif b == "NOT":
+        # TODO
+        pass
+    elif b == "(":
+        if a == "AND" or a == "OR" or a == "NOT" or a == "(" or a == "#":
+            return '<'
+    elif b == ")":
+        if a == "AND" or a == "OR" or a == "NOT" or a == ")":
+            return '>'
+        elif a == "(":
+            return '='
+    elif b == "#":
+        if a == "#":
+            return '='
+        else:
+            return '>'
+    print("Error input")
+    sys.exit(main, 0)
+
+def operate(a, theta, b):
+    if theta == "AND":
+        return op_and(a, b)
+    elif theta == "OR":
+        return op_or(a, b)
+    elif theta == "NOT":
+        all_index = list(range(517402)) # TODO
+        # no a
+
+def op_and(a, b): # list a b
+    seen = set()
+    duplicated = set()
+
+    for x in a+b:
+        if x not in seen:
+            seen.add(x)
+        else:
+            duplicated.add(x)
+    return list(duplicated)
 
 def op_or(a, b):
     return list(set(a + b))
-
-
-
-
-
-def ander(result):
-    if len(result) == 2:
-        return (result[0], result[1])
-    return result[0]
-
-
-'''
-class Node(object):
-    def __init__(self, item, op = False):
-        self.item = item
-        self.op = op
-        self.left = None
-        self.right = None
-
-    def __str__(self):
-        return str(self.item)
-
-    def is_op(self):
-        return self.op
-'''
 
 '''
 Get words in a paragraph, No numbers, punctuations, stopwords in words.
@@ -606,27 +638,6 @@ class Searcher:
             result = []
         return result
 
-    def op_and(self, a, b, words_dict): # query word
-        seen = set()
-        duplicated = set()
-
-        if type(b) is tuple: # (x, (x, (x, x)))
-            b = self.op_and(b[0], b[1], words_dict)
-        if type(a) is not list:
-            a_list = self._search(a, words_dict)
-        else:
-            a_list = a
-        if type(b) is not list:
-            b_list = self._search(b, words_dict)
-        else:
-            b_list = b
-        for x in a_list+b_list:
-            if x not in seen:
-                seen.add(x)
-            else:
-                duplicated.add(x)
-        return list(duplicated)
-
     def search(self):
         filename = list()
         words_dict = dict()
@@ -648,42 +659,40 @@ class Searcher:
         # print(words_dict)
 
         while True:
-            print("Please input space in parenthesis(brace) and items")
+            print("Please input one space between all words(include parenthesis/brace and items), End with \' #\', and NOT support \'NOT\'.")
             searching = input("(quit by input \'EXIT\')Search for:")
             if searching == 'EXIT':
                 break
             else:
-                text = String() | Word()
-                andClausePrime = Delayed()
-                label = text & Drop(':')
-                with DroppedSpace():
-                    parameter = label & text > (lambda r: {r[0]: r[1]})
-                    andClause = (parameter | text) & andClausePrime > ander
-                    andClausePrime += (Drop('AND') & (andClause | parameter | text) & andClausePrime)[:]
-                    expr = andClause | parameter | text
-                    query = expr & (Drop('OR') & expr)[:]
-
-                query_parsed = query.parse(searching)
-                exist_list = list()
-                for item in query_parsed:
-                    if type(item) is tuple: # tuple and list mixup
-                        exist_list += self.op_and(item[0], item[1], words_dict)
-                        print(self.op_and(item[0], item[1], words_dict))
-                        pass
-                    '''
-                    if type(item) is list:
-                        exist_list += item
-                        pass
-                    if type(item) is int:
-                        exist_list.append(item)
-                        pass
-                    '''
-                    if type(item) is list:
-                        print(self._search(item, words_dict))
-                        exist_list += self._search(item, words_dict)
-                        pass
-                result = list(set(exist_list))
-                print(len(result))
+                searching = searching.split(" ")
+                opnd = list()
+                optr = list()
+                optr.append("#")
+                i = 0
+                item = searching[0]
+                search_size = len(searching)
+                while (item != "#" or optr[-1] != "#") and i < search_size:
+                    if not isOP(item):
+                        input_list = self._search(item, words_dict)
+                        opnd.append(input_list)
+                        i += 1
+                        item = searching[i]
+                    else:
+                        prior = precede(optr[-1], item)
+                        if prior == "<":
+                            optr.append(item)
+                            i += 1
+                            item = searching[i]
+                        elif prior == ">":
+                            theta = optr.pop()
+                            b = opnd.pop()
+                            a = opnd.pop()
+                            opnd.append(operate(a, theta, b))
+                        else:
+                            optr.pop()
+                            i += 1
+                            item = searching[i]
+                result = opnd[-1]
 
                 if len(result) > 0:
                     print("Found in", len(result), "files. First found in", filename[int(result[0])])
