@@ -35,20 +35,20 @@ def isOP(ch):
     else:
         return False
 
-def precede(a, b):
+def precede(a, b): # TODO add NOT
     if b == "AND":
         if a == "OR" or a == "#" or a == "(":
             return '<'
-        elif a == "AND" or a == ")":
+        elif a == "AND" or a == ")" or a == "NOT":
             return '>'
     elif b == "OR":
         if a == "#" or a == "(":
             return '<'
-        elif a == ")" or a == "OR" or a == "AND":
+        elif a == ")" or a == "OR" or a == "AND" or a == "NOT":
             return '>'
     elif b == "NOT":
-        # TODO
-        pass
+        if a == "AND" or a == "OR" or a == "(" or a == "#":
+            return '<'
     elif b == "(":
         if a == "AND" or a == "OR" or a == "NOT" or a == "(" or a == "#":
             return '<'
@@ -70,9 +70,14 @@ def operate(a, theta, b):
         return op_and(a, b)
     elif theta == "OR":
         return op_or(a, b)
-    elif theta == "NOT":
-        all_index = list(range(517402)) # TODO
-        # no a
+    print("Error input")
+    sys.exit(main, 0)
+
+def op_not(a): # list a
+    all_index = list(range(517402))
+    for i in a:
+        all_index.remove(i)
+    return all_index
 
 def op_and(a, b): # list a b
     seen = set()
@@ -685,9 +690,13 @@ class Searcher:
                             item = searching[i]
                         elif prior == ">":
                             theta = optr.pop()
-                            b = opnd.pop()
-                            a = opnd.pop()
-                            opnd.append(operate(a, theta, b))
+                            if theta == "NOT":
+                                b = opnd.pop()
+                                opnd.append(op_not(b))
+                            else:
+                                b = opnd.pop()
+                                a = opnd.pop()
+                                opnd.append(operate(a, theta, b))
                         else:
                             optr.pop()
                             i += 1
