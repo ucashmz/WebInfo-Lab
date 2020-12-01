@@ -74,10 +74,22 @@ def operate(a, theta, b):
     sys.exit(main, 0)
 
 def op_not(a: list):
+    '''
     all_index = list(range(517402))
     for i in a:
         all_index.remove(int(i))
     return all_index
+    '''
+    index = list()
+    i = 0
+    size = len(a)
+    for r in range(517402):
+        if i < size and r == int(a[i]):
+            print(a[i])
+            i += 1
+            continue
+        index.append(r)
+    return index
 
 def op_and(a: list, b: list):
     seen = set()
