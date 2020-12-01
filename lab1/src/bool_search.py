@@ -84,11 +84,10 @@ def op_not(a: list):
     i = 0
     size = len(a)
     for r in range(517402):
-        if i < size and r == int(a[i]):
-            print(a[i])
+        if i < size and str(r) == a[i]:
             i += 1
             continue
-        index.append(r)
+        index.append(str(r))
     return index
 
 def op_and(a: list, b: list):
