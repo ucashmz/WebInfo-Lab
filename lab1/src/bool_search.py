@@ -240,17 +240,13 @@ class Searcher:
         print("Else exit.")
         index = input()
         if index == '1':
-            self.get_tfidf_table()
-            pass
+            self.get_inverted_table_list()
         elif index == '2':
             self.search()
-            pass
         elif index == '3':
             self.get_tfidf_table()
-            pass
         elif index == '4':
             self.tfidf_search()
-            pass
 
     '''
     For inverted_table and tf_table 's generation.
