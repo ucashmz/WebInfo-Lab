@@ -73,13 +73,13 @@ def operate(a, theta, b):
     print("Error input")
     sys.exit(main, 0)
 
-def op_not(a): # list a
+def op_not(a: list):
     all_index = list(range(517402))
     for i in a:
-        all_index.remove(i)
+        all_index.remove(int(i))
     return all_index
 
-def op_and(a, b): # list a b
+def op_and(a: list, b: list):
     seen = set()
     duplicated = set()
 
@@ -664,7 +664,7 @@ class Searcher:
         # print(words_dict)
 
         while True:
-            print("Please input one space between all words(include parenthesis/brace and items), End with \' #\', and NOT support \'NOT\'.")
+            print("Please input one space between all words(include parenthesis/brace and items), End with \' #\'.")
             searching = input("(quit by input \'EXIT\')Search for:")
             if searching == 'EXIT':
                 break
