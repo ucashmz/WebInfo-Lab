@@ -198,7 +198,7 @@ class Searcher:
 
     def init(self):
         if not (os.path.exists(self.filename_path) and os.path.exists(self.words_list)):
-            if os.path.exists(self.inverted_table + '.csv') or os.path.exists(self.tfidf_table_path) or self.get_inverted_table_list or self.get_tf_table_list:
+            if os.path.exists(self.inverted_table + '.csv') or os.path.exists(self.tfidf_table_path):# or self.get_inverted_table_list or self.get_tf_table_list:
                 print(
                     "ERROR: Without filename or words_list, but inverted_table or tfidf_table found.")
                 print("       Remove inverted_table and tfidf_table first and restart.")
