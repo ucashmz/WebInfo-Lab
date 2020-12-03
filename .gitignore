@@ -1,6 +1,9 @@
 # data
 lab1/dataset/
 
+# backup
+lab1/backup/
+
 #output
 lab1/output/*
 

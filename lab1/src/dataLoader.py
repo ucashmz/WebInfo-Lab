@@ -27,83 +27,6 @@ def read_file(file_path, error_log, counter):
         paragraphs = content.split('\n\n')[1:]  # discard header of the email
     return paragraphs
 
-def isOP(ch):
-    if ch == "AND" or ch == "OR" or ch == "NOT":
-        return True
-    elif ch == "(" or ch == ")" or ch == "#":
-        return True
-    else:
-        return False
-
-def precede(a, b): # TODO add NOT
-    if b == "AND":
-        if a == "OR" or a == "#" or a == "(":
-            return '<'
-        elif a == "AND" or a == ")" or a == "NOT":
-            return '>'
-    elif b == "OR":
-        if a == "#" or a == "(":
-            return '<'
-        elif a == ")" or a == "OR" or a == "AND" or a == "NOT":
-            return '>'
-    elif b == "NOT":
-        if a == "AND" or a == "OR" or a == "(" or a == "#":
-            return '<'
-    elif b == "(":
-        if a == "AND" or a == "OR" or a == "NOT" or a == "(" or a == "#":
-            return '<'
-    elif b == ")":
-        if a == "AND" or a == "OR" or a == "NOT" or a == ")":
-            return '>'
-        elif a == "(":
-            return '='
-    elif b == "#":
-        if a == "#":
-            return '='
-        else:
-            return '>'
-    print("Error input")
-    sys.exit(main, 0)
-
-def operate(a, theta, b):
-    if theta == "AND":
-        return op_and(a, b)
-    elif theta == "OR":
-        return op_or(a, b)
-    print("Error input")
-    sys.exit(main, 0)
-
-def op_not(a: list):
-    '''
-    all_index = list(range(517402))
-    for i in a:
-        all_index.remove(int(i))
-    return all_index
-    '''
-    index = list()
-    i = 0
-    size = len(a)
-    for r in range(517402):
-        if i < size and str(r) == a[i]:
-            i += 1
-            continue
-        index.append(str(r))
-    return index
-
-def op_and(a: list, b: list):
-    seen = set()
-    duplicated = set()
-
-    for x in a+b:
-        if x not in seen:
-            seen.add(x)
-        else:
-            duplicated.add(x)
-    return list(duplicated)
-
-def op_or(a, b):
-    return list(set(a + b))
-
 '''
 Get words in a paragraph, No numbers, punctuations, stopwords in words.
 Cache (type:dict()) is used to reduce time cost during getting word's stem.
@@ -123,6 +46,7 @@ def tokenize_paragraph(paragraph, stops, cache):
         if word not in cache:
             cache[word] = PorterStemmer().stem(word)
         word_stem.append(cache[word])
+        # word_stem.append(PorterStemmer().stem(word))
     return word_stem
 
 
@@ -167,15 +91,10 @@ def get_tf(file_path, error_log, counter, cache, limit):
     return words_tf
 
 
-def vector_normalize(vector):
-    len = np.sqrt(np.sum(np.square(vector)))
-    if len == 0:
-        return vector
-    else:
-        return vector/len
 
 
-class Searcher:
+
+class DataLoader:
     def __init__(self, config):
         self.dataset_path = config['dataset_path']
         self.filename_path = config['filename_path']
@@ -230,23 +149,6 @@ class Searcher:
                 self.get_inverted_table_and_tf_table()
             self.get_tfidf_table()
         print("Initialization Complete.")
-
-    def run(self):
-        self.init()
-        print("1. gen inverted_table")
-        print("2. bool search")
-        print("3. gen tfidf_table")
-        print("4. tfidf search")
-        print("Else exit.")
-        index = input()
-        if index == '1':
-            self.get_inverted_table_list()
-        elif index == '2':
-            self.search()
-        elif index == '3':
-            self.get_tfidf_table()
-        elif index == '4':
-            self.tfidf_search()
 
     '''
     For inverted_table and tf_table 's generation.
@@ -360,6 +262,7 @@ class Searcher:
                                 temp.append(j)
                                 temp.append(tf_table[i][j])
                         f_csv.writerow(temp)
+                        # f_csv.writerow(tf_table[i])
 
                 print(tf_table_path, "has been saved.")
 
@@ -587,139 +490,11 @@ class Searcher:
             tfidf_vector.append(words_tf[word])
         return np.array(tfidf_vector)
 
-    '''
-    Return first 10 files most related to searching words
-    '''
-
-    def _tfidf_search(self, searching_words):
-        tfidf_vector = self.get_tfidf_vector(searching_words)
-        # print(len(tfidf_vector))
-
-        result = []
-        with open(self.tfidf_table_path, 'r') as f:
-            table_line = f.readline()
-            ctr = 0
-            while table_line:
-                # data: [..., i, i.tfidf_value, ...]
-                data = table_line.split("\n")[0].split(",")
-                file_tfidf_vector = np.zeros(len(self.words_list_sorted))
-                for i in range(len(data)//2):
-                    file_tfidf_vector[int(data[i*2])] = float(data[2*i+1])
-                # print(len(file_tfidf_vector))
-                dist = np.sqrt(np.sum(np.square(vector_normalize(
-                    tfidf_vector) - vector_normalize(file_tfidf_vector))))
-                result.append((ctr, dist))
-                ctr += 1
-                if ctr % 20000 == 0:
-                    print(ctr, "files have been visited")
-                table_line = f.readline()
-                # print(result)
-        print()
-        result = [file[0] for file in sorted(result, key=lambda x:x[1])[:10]]
-        return result
-
-    def tfidf_search(self):
-        filename = list()
-        with open(self.filename_path, 'r') as f:
-            filename = f.readlines()
-
-        while True:
-            searching = input("(quit by input \'EXIT\')Search for:")
-            if searching == 'EXIT':
-                break
-            else:
-                separate_search_word = searching.split()
-                files_id = self._tfidf_search(separate_search_word)
-                print("Most related files:")
-                for file_id in files_id:
-                    print("\t", filename[file_id])
-
-    '''
-    Search a word.
-    Words_dict is organized as: words_dict[word] = i, while i is the line of the word in inverted table
-    Return a list of files_id in which the word occurs
-    '''
-
-    def _search(self, searching_word, words_dict):
-        searching_stem = PorterStemmer().stem(searching_word.lower())
-        if searching_stem in words_dict:
-            result = linecache.getline(
-                self.inverted_table + '.csv', words_dict[searching_stem]).split(',')[1:]
-            linecache.clearcache()
-        else:
-            result = []
-        return result
-
-    def search(self):
-        filename = list()
-        words_dict = dict()
-        with open(self.filename_path, 'r') as f:
-            filename = f.readlines()
-        print("Loading inverted table..")
-
-        '''
-        load words_dict from inverted_table
-        '''
-        with open(self.inverted_table + '.csv', 'r') as f:
-            table_line = f.readline().split('\n')[0]
-            ctr = 1
-            while table_line:
-                word = table_line.split(",")[0]
-                words_dict[word] = ctr
-                ctr += 1
-                table_line = f.readline().split('\n')[0]
-        # print(words_dict)
-
-        while True:
-            print("Please input one space between all words(include parenthesis/brace and items), End with \' #\'.")
-            searching = input("(quit by input \'EXIT\')Search for:")
-            if searching == 'EXIT':
-                break
-            else:
-                searching = searching.split(" ")
-                opnd = list()
-                optr = list()
-                optr.append("#")
-                i = 0
-                item = searching[0]
-                search_size = len(searching)
-                while (item != "#" or optr[-1] != "#") and i < search_size:
-                    if not isOP(item):
-                        input_list = self._search(item, words_dict)
-                        opnd.append(input_list)
-                        i += 1
-                        item = searching[i]
-                    else:
-                        prior = precede(optr[-1], item)
-                        if prior == "<":
-                            optr.append(item)
-                            i += 1
-                            item = searching[i]
-                        elif prior == ">":
-                            theta = optr.pop()
-                            if theta == "NOT":
-                                b = opnd.pop()
-                                opnd.append(op_not(b))
-                            else:
-                                b = opnd.pop()
-                                a = opnd.pop()
-                                opnd.append(operate(a, theta, b))
-                        else:
-                            optr.pop()
-                            i += 1
-                            item = searching[i]
-                result = opnd[-1]
-
-                if len(result) > 0:
-                    print("Found in", len(result), "files. First found in", filename[int(result[0])])
-                else:
-                    print("Not found.")
-
-
+    
 def main():
     os.chdir(conf["WORKPATH"])
-    searcher = Searcher(conf)
-    searcher.run()
+    dataloader = DataLoader(conf)
+    dataloader.init()
 
 
 if __name__ == '__main__':
