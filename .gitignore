@@ -11,4 +11,5 @@ lab1/output/*
 __pycache__
 
 lab1/src/config.py
+*.zip
 .vscode
