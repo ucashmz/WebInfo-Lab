@@ -46,7 +46,7 @@ class Dataset():
             while line and ctr < end:
                 sentence = line.split("\"")[-2]
                 if ctr >= start and ctr < end:
-                    dest.write(sentence + "\n")
+                    dest.write(sentence.replace('%', '') + "\n")
                 if label_path:
                     line = src.readline()
                     label = labels[line.split("(")[0]]
@@ -62,7 +62,7 @@ class Dataset():
 
             print("Finished.", ctr-start, "sentences counted.")
 
-    def get_word_frequnce(self, select_word = True):
+    def get_word_frequence(self, select_word = True):
         print("Getting word frequency list..")
         words = dict()
         with open(self.train_dataset, 'r') as data, open("result\\word_frequnce.txt", 'w') as frequence:

@@ -13,8 +13,8 @@ def main():
             conf["valid_label"],
             conf["test_dataset"],
             conf["stanford_core_nlp"])
-    # dataset.run()
-    # dataset.get_word_frequence()
+    dataset.run()
+    dataset.get_word_frequence()
 
     bayes = Bayes(conf["train_dataset"],
                   conf["train_label"],
@@ -23,7 +23,7 @@ def main():
                   conf["valid_num"],
                   conf["result_dir"],
                   conf["stanford_core_nlp"])
-    # bayes.run()
+    bayes.run()
     # bayes.get_word_frequence_for_each_label()
 
 if __name__ == '__main__':
