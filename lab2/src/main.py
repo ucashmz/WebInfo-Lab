@@ -7,24 +7,24 @@ from labels import labels
 
 def main():
     os.chdir(conf["WORKPATH"])
-    dataset = Dataset(conf["raw_data_train"],
-            conf["raw_data_test"],
-            conf["train_dataset"],
-            conf["train_label"],
-            conf["valid_dataset"],
-            conf["valid_label"],
-            conf["test_dataset"],
-            conf["stanford_core_nlp"])
-    # dataset.run()
-    # dataset.get_word_frequence()
+    # dataset = Dataset(conf["raw_data_train"],
+    #         conf["raw_data_test"],
+    #         conf["train_dataset"],
+    #         conf["train_label"],
+    #         conf["valid_dataset"],
+    #         conf["valid_label"],
+    #         conf["test_dataset"],
+    #         conf["stanford_core_nlp"])
+    # # dataset.run()
+    # # dataset.get_word_frequence()
 
-    bayes = Bayes(conf["train_dataset"],
-                  conf["train_label"],
-                  conf["valid_dataset"],
-                  conf["valid_label"],
-                  conf["valid_num"],
-                  conf["result_dir"],
-                  conf["stanford_core_nlp"])
+    # bayes = Bayes(conf["train_dataset"],
+    #               conf["train_label"],
+    #               conf["valid_dataset"],
+    #               conf["valid_label"],
+    #               conf["valid_num"],
+    #               conf["result_dir"],
+    #               conf["stanford_core_nlp"])
     # bayes.run()
 
     rnn = RNN(conf['raw_data_train'],
@@ -34,7 +34,7 @@ def main():
               conf['glove_dir'],
               conf['stanford_core_nlp'],
               labels)
-    rnn.run()
+    rnn.run(need_process=False)
     
 if __name__ == '__main__':
     main()

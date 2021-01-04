@@ -26,8 +26,8 @@ class RNN:
         self.batch_size = 500
         self.epochs = 100           # total epoches 
 
-    def run(self):
-        self.preprocess()
+    def run(self, need_process=False):
+        self.preprocess(need_process)
         self.train()
         self.test()
 
