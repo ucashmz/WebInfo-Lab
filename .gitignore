@@ -1,5 +1,7 @@
 # data
 lab1/dataset/
+lab2/dataset/*
+lab3/dataset/
 
 # backup
 lab1/backup/
@@ -7,7 +9,6 @@ lab1/backup/
 #output
 lab1/output/*
 lab2/result/*
-lab2/dataset/*
 
 #pycache
 __pycache__
