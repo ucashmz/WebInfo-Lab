@@ -25,7 +25,8 @@ class Knn:
         self.trainData = config['trainData']
         self.userAve = config['userAve']
 
-    def genFromTrain(self):
+    def genMTrain(self):
+        print("genMTrain")
         trainDat = os.path.join(self.dataset_path, self.trainData)
         if not os.path.exists(trainDat):
             print("not found dataset, it should be WORKPATH/dataset/training.dat")
@@ -60,10 +61,10 @@ class Knn:
         # print(nonzero)
         # print(origin)
         # print(size(nonzero))
-        csvfile.close()
         return origin, nonzero
-    
-    def getAver(self, origin, nonzero):
+
+    def getAverV(self, origin, nonzero):
+        print("getAverV")
         sumV = origin.sum(axis=0)
         users = size(sumV)
         averV = np.zeros(users, dtype=float)
@@ -72,6 +73,48 @@ class Knn:
             if math.isnan(averV[i]):
                 averV[i] = float(0)
         return averV
+
+    def genNewM(self, origin, averV):
+        print("genNewM")
+        newM = np.zeros(origin.shape, dtype=float)
+        for y in range(origin.shape[1]):
+            for x in range(origin.shape[0]):
+                if origin[x][y] != 0:
+                    newM[x][y] = float(origin[x][y]) - averV[y]
+        return newM
+
+    def getSqrtV(self, newM):
+        print("getSqrtV")
+        sqrtV = np.zeros(newM.shape[1], dtype=float)
+        for y in range(newM.shape[1]):
+            sumup = float(0)
+            for x in range(newM.shape[0]):
+                sumup += np.square(newM[x][y])
+            sqrtV[y] = np.sqrt(sumup)
+        return sqrtV
+
+    def getSim(self, newM, sqrtV, userid):
+        print("getSim")
+        simV = np.zeros(newM.shape[1], dtype=float)
+        for y in range(newM.shape[1]):
+            sumup = float(0)
+            for x in range(newM.shape[0]):
+                sumup += newM[x][y] * newM[x][userid]
+            simV[y] = sumup/sqrtV[y]/sqrtV[userid]
+        return simV
+
+    def recommend(self, newM, sqrtV, averV):
+        print("recommend")
+        testDat = os.path.join(self.dataset_path, self.testData)
+        if not os.path.exists(testDat):
+            print("not found dataset, it should be WORKPATH/dataset/testing.dat")
+            exit()
+        with open(testDat, 'r', encoding='utf-8') as csvfile:
+            cs = list(csv.reader(csvfile))
+        for record in cs:
+            simV = self.getSim(newM, sqrtV, int(record[0]))
+            # get k nn
+            # print value
 
 '''
 M = np.asarray([[3, 7, 4, 9, 9, 7],

@@ -9,6 +9,7 @@ lab1/backup/
 #output
 lab1/output/*
 lab2/result/*
+lab3/output/*
 
 #pycache
 __pycache__
