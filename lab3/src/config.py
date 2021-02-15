@@ -7,4 +7,5 @@ conf = {
     "userAve":"ave.out",
     "userNewM":"newM.out",
     "userSqrtV":"sqrtV.out",
+    "testing_out":"out.out",
 }
