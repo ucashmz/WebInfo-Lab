@@ -51,7 +51,8 @@ class Knn:
         nonzero = np.zeros(maxuser + 1, dtype=int)
         for record in cs:
             origin[int(record[1])][int(record[0])] = int(record[2])
-            nonzero[int(record[0])] += 1
+            if int(record[2]) != 0:
+                nonzero[int(record[0])] += 1
         # print(nonzero)
         # print(origin)
         # print(size(nonzero))
