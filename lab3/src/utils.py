@@ -138,3 +138,209 @@ class Knn:
             for item in result:
                 print(item)
             sys.stdout = original_stdout
+
+
+class Knn_2:
+    def __init__(self, config):
+        self.dir = config['WORKPATH']
+        self.dataset_path = config['dataset_path']
+        self.testData = config['testData']
+        self.trainData = config['trainData']
+        self.userAve = config['userAve']
+        self.testing_out = config['testing_out']
+        self.out_path = config["out_path"]
+
+    def init(self):
+        '''
+        output: data: dictionary of dictionary, data[USER][MOVIE] = RATE
+        '''
+        print("genMTrain")
+        trainDat = os.path.join(self.dataset_path, self.trainData)
+        data = dict()
+        if not os.path.exists(trainDat):
+            print("not found dataset, it should be WORKPATH/dataset/training.dat")
+            exit()
+        # file_path = os.path.join(self.dataset_path, filename)
+        with open(trainDat, 'r', encoding='utf-8') as csvfile:
+            cs = list(csv.reader(csvfile))
+        for record in cs:
+            if int(record[2]) != 0:
+                if record[0] not in data:
+                    data[record[0]] = dict()
+                data[record[0]][record[1]] = int(record[2])
+        return data
+
+    def getAverV(self, data):
+        '''
+        output: averV: np array
+        '''
+        averV = np.zeros(2185)
+        for user in data.keys():
+            averV[int(user)] = np.mean(list(data[user].values()))
+        print("averV:", averV)    
+        return averV
+
+    def getNormalized(self, data, averV, sqrtV):
+        '''
+        normalize data with averV and sqrtV
+        '''
+        print("getNormalized")
+        for user in data.keys():
+            for movie in data[user].keys():
+                data[user][movie] = (data[user][movie] - averV[int(user)]) / sqrtV[int(user)]    
+        # print(data)
+
+    def getSqrtV(self, data, averV):
+        '''
+        output: sqrtV: np array
+        '''
+        sqrtV = np.zeros(2185)
+        for user in data.keys():
+            movies = list(data[user].values())
+            aver = averV[int(user)]
+            movies = [movie - aver for movie in movies]
+            # print(movies)
+            sqrtV[int(user)] = np.sqrt(np.mean(np.square(movies)))
+        print("sqrtV:", sqrtV)
+        return sqrtV
+
+    def getSim(self, data, userid):
+        '''
+        Sparse Matrix?
+        Only if a movie is rated by both users, calculate the square sum
+        '''
+        print("getSim, userId = ", userid)
+        userid = str(userid)
+        simV = np.zeros(2185)
+        for user in data.keys():
+            if len(data[userid]) > len(data[user]):
+                a = data[userid]
+                b = data[user]
+            else:
+                a = data[user]
+                b = data[userid]
+            sumAA = 0
+            sumBB = 0
+            sumAB = 0
+            for movie in b.keys():
+                if movie in a:
+                    sumAA += a[movie]*a[movie]
+                    sumAB += a[movie]*b[movie]
+                    sumBB += b[movie]*b[movie]
+            
+            if sumAA > 0 and sumBB > 0:
+                simV[int(user)] = sumAB / np.sqrt(sumAA) / np.sqrt(sumBB)
+
+        return simV
+
+    def recommend(self, data, sqrtV, averV):
+        print("recommend")
+        result = []
+        testDat = os.path.join(self.dataset_path, self.testData)
+        if not os.path.exists(testDat):
+            print("not found dataset, it should be WORKPATH/dataset/testing.dat")
+            exit()
+        with open(testDat, 'r', encoding='utf-8') as csvfile:
+            cs = list(csv.reader(csvfile))
+        simV = self.getSim(data, int(cs[0][0]))
+        userId = int(cs[0][0])
+        for record in cs:
+            if int(record[0]) != userId:
+                print("same")
+                userId = int(record[0])
+                simV = self.getSim(data, int(record[0]))
+            kNear = []
+            tmpV = simV.tolist()
+            index = 0
+            while index < 5:
+                maxSim = tmpV.index(max(tmpV))
+                if max(tmpV) <= 0: # bug fix here, allow using less than 5 neighbors if similarity already less than 0
+                    break
+                # print(data[str(maxSim)])
+                if record[1] in data[str(maxSim)]:
+                    kNear.append(maxSim)
+                    index += 1
+                tmpV[maxSim] = -1
+            print(kNear)
+            print(averV[userId], sqrtV[userId])
+            out = 0.0
+            sumSim = 0.0
+            for user in kNear:
+                out += simV[user] * data[str(user)][record[1]]
+                print(data[str(user)][record[1]])
+                sumSim += simV[user]
+            if sumSim == 0: 
+                    out = 3.8
+                else:
+                    out = out/sumSim * sqrtV[userId] + averV[userId] # bug fix here, need to multiply sqrt
+                    if out > 5: 
+                        out = 5
+                    if out < 1:
+                        out = 1 
+            print(userId, int(record[1]), out)
+            
+            result.append(out)
+
+        original_stdout = sys.stdout
+        with open(os.path.join(self.out_path, self.testing_out), 'w', encoding='utf-8') as file:
+            sys.stdout = file
+            for item in result:
+                print(item)
+            sys.stdout = original_stdout
+    
+    def validation(self, data, sqrtV, averV):
+        print("validation")
+        error = 0
+        count = 0
+        testDat = os.path.join(self.dataset_path, self.trainData) # run on training data, record with rating != 0 
+        if not os.path.exists(testDat):
+            print("not found dataset, it should be WORKPATH/dataset/training.dat")
+            exit()
+        with open(testDat, 'r', encoding='utf-8') as csvfile:
+            cs = list(csv.reader(csvfile))
+        simV = self.getSim(data, int(cs[0][0]))
+        userId = int(cs[0][0])
+        for record in cs:
+            if int(record[2]) != 0:
+                if int(record[0]) != userId:
+                    print("same")
+                    userId = int(record[0])
+                    simV = self.getSim(data, int(record[0]))
+                kNear = []
+                tmpV = simV.tolist()
+                index = 0
+                while index < 5:
+                    maxSim = tmpV.index(max(tmpV))
+                    if max(tmpV) <= 0:
+                        break
+                    # print(data[str(maxSim)])
+                    if record[1] in data[str(maxSim)] and maxSim != userId:
+                        kNear.append(maxSim)
+                        index += 1
+                    tmpV[maxSim] = -1
+                # print(kNear)
+                # print(averV[userId], sqrtV[userId])
+                out = 0.0
+                sumSim = 0.0
+                for user in kNear:
+                    out += simV[user] * data[str(user)][record[1]]
+                    # print(data[str(user)][record[1]])
+                    sumSim += simV[user]
+                if sumSim == 0: 
+                    out = 3.8
+                else:
+                    out = out/sumSim * sqrtV[userId] + averV[userId]
+                    if out > 5: 
+                        out = 5
+                    if out < 1:
+                        out = 1
+                # print(userId, int(record[1]), out, record[2])
+                error += math.pow(float(record[2]) - out, 2)
+                count += 1
+                if count % 1000 == 0:
+                    print(count/1000)
+                if count == 5000: # just run 5000 ratings
+                    break
+        
+        print("RMSE: ", math.sqrt(error/count))
+
