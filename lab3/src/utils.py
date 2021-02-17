@@ -213,8 +213,10 @@ class Knn_2:
         Only if a movie is rated by both users, calculate the square sum
         '''
         print("getSim, userId = ", userid)
-        userid = str(userid)
         simV = np.zeros(2185)
+        userid = str(userid)
+        if userid not in data:
+            retun simV
         for user in data.keys():
             if len(data[userid]) > len(data[user]):
                 a = data[userid]
