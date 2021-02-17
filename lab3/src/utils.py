@@ -280,15 +280,12 @@ class Knn_2:
                 if out < 0:
                     out = 0
                 out = round(out)
-            print(userId, int(record[1]), out)
+            # print(userId, int(record[1]), out)
             result.append(out)
 
-        original_stdout = sys.stdout
-        with open(os.path.join(self.out_path, self.testing_out), 'w', encoding='utf-8') as file:
-            sys.stdout = file
-            for item in result:
-                print(item)
-            sys.stdout = original_stdout
+            with open(os.path.join(self.out_path, self.testing_out), 'a', encoding='utf-8') as file:
+                file.write(str(out))
+                file.write('\n')
 
     def validation(self, data, sqrtV, averV):
         print("validation")
