@@ -9,6 +9,7 @@ from numpy.core.fromnumeric import size
 
 # https://github.com/csaluja/JupyterNotebooks-Medium
 
+
 class Knn:
     def __init__(self, config):
         self.dir = config['WORKPATH']
@@ -178,7 +179,7 @@ class Knn_2:
         averV = np.zeros(2185)
         for user in data.keys():
             averV[int(user)] = np.mean(list(data[user].values()))
-        print("averV:", averV)    
+        print("averV:", averV)
         return averV
 
     def getNormalized(self, data, averV, sqrtV):
@@ -188,7 +189,8 @@ class Knn_2:
         print("getNormalized")
         for user in data.keys():
             for movie in data[user].keys():
-                data[user][movie] = (data[user][movie] - averV[int(user)]) / sqrtV[int(user)]    
+                data[user][movie] = (data[user][movie] -
+                                     averV[int(user)]) / sqrtV[int(user)]
         # print(data)
 
     def getSqrtV(self, data, averV):
@@ -228,10 +230,8 @@ class Knn_2:
                     sumAA += a[movie]*a[movie]
                     sumAB += a[movie]*b[movie]
                     sumBB += b[movie]*b[movie]
-            
             if sumAA > 0 and sumBB > 0:
                 simV[int(user)] = sumAB / np.sqrt(sumAA) / np.sqrt(sumBB)
-
         return simV
 
     def recommend(self, data, sqrtV, averV):
@@ -247,39 +247,40 @@ class Knn_2:
         userId = int(cs[0][0])
         for record in cs:
             if int(record[0]) != userId:
-                print("same")
+                # print("same")
                 userId = int(record[0])
                 simV = self.getSim(data, int(record[0]))
             kNear = []
             tmpV = simV.tolist()
             index = 0
-            while index < 5:
+            while index < 15:
                 maxSim = tmpV.index(max(tmpV))
-                if max(tmpV) <= 0: # bug fix here, allow using less than 5 neighbors if similarity already less than 0
+                # bug fix here, allow using less than 5 neighbors if similarity already less than 0
+                if max(tmpV) <= 0:
                     break
                 # print(data[str(maxSim)])
                 if record[1] in data[str(maxSim)]:
                     kNear.append(maxSim)
                     index += 1
                 tmpV[maxSim] = -1
-            print(kNear)
-            print(averV[userId], sqrtV[userId])
+            # print(kNear)
+            # print(averV[userId], sqrtV[userId])
             out = 0.0
             sumSim = 0.0
             for user in kNear:
                 out += simV[user] * data[str(user)][record[1]]
-                print(data[str(user)][record[1]])
+                # print(data[str(user)][record[1]])
                 sumSim += simV[user]
-            if sumSim == 0: 
-                out = 3.8
+            if sumSim == 0:
+                out = averV[userId]
             else:
-                out = out/sumSim * sqrtV[userId] + averV[userId] # bug fix here, need to multiply sqrt
-                if out > 5: 
+                out = out/sumSim + averV[userId]
+                if out > 5:
                     out = 5
-                if out < 1:
-                    out = 1 
+                if out < 0:
+                    out = 0
+                out = round(out)
             print(userId, int(record[1]), out)
-            
             result.append(out)
 
         original_stdout = sys.stdout
@@ -288,12 +289,13 @@ class Knn_2:
             for item in result:
                 print(item)
             sys.stdout = original_stdout
-    
+
     def validation(self, data, sqrtV, averV):
         print("validation")
         error = 0
         count = 0
-        testDat = os.path.join(self.dataset_path, self.trainData) # run on training data, record with rating != 0 
+        # run on training data, record with rating != 0
+        testDat = os.path.join(self.dataset_path, self.trainData)
         if not os.path.exists(testDat):
             print("not found dataset, it should be WORKPATH/dataset/training.dat")
             exit()
@@ -327,11 +329,11 @@ class Knn_2:
                     out += simV[user] * data[str(user)][record[1]]
                     # print(data[str(user)][record[1]])
                     sumSim += simV[user]
-                if sumSim == 0: 
+                if sumSim == 0:
                     out = 3.8
                 else:
                     out = out/sumSim * sqrtV[userId] + averV[userId]
-                    if out > 5: 
+                    if out > 5:
                         out = 5
                     if out < 1:
                         out = 1
@@ -340,8 +342,7 @@ class Knn_2:
                 count += 1
                 if count % 1000 == 0:
                     print(count/1000)
-                if count == 5000: # just run 5000 ratings
+                if count == 5000:  # just run 5000 ratings
                     break
-        
-        print("RMSE: ", math.sqrt(error/count))
 
+        print("RMSE: ", math.sqrt(error/count))

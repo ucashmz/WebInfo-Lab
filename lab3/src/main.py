@@ -53,8 +53,8 @@ def main():
     averV = M.getAverV(data)
     sqrtV = M.getSqrtV(data,averV)
     M.getNormalized(data, averV, sqrtV)
-    # M.recommend(data, sqrtV, averV)
-    M.validation(data, sqrtV, averV)
+    M.recommend(data, sqrtV, averV)
+    # M.validation(data, sqrtV, averV)
 
 
 if __name__ == '__main__':
