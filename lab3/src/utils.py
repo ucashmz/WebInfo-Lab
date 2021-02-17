@@ -216,7 +216,7 @@ class Knn_2:
         simV = np.zeros(2185)
         userid = str(userid)
         if userid not in data:
-            retun simV
+            return simV
         for user in data.keys():
             if len(data[userid]) > len(data[user]):
                 a = data[userid]
