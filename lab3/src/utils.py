@@ -271,13 +271,13 @@ class Knn_2:
                 print(data[str(user)][record[1]])
                 sumSim += simV[user]
             if sumSim == 0: 
-                    out = 3.8
-                else:
-                    out = out/sumSim * sqrtV[userId] + averV[userId] # bug fix here, need to multiply sqrt
-                    if out > 5: 
-                        out = 5
-                    if out < 1:
-                        out = 1 
+                out = 3.8
+            else:
+                out = out/sumSim * sqrtV[userId] + averV[userId] # bug fix here, need to multiply sqrt
+                if out > 5: 
+                    out = 5
+                if out < 1:
+                    out = 1 
             print(userId, int(record[1]), out)
             
             result.append(out)
