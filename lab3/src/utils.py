@@ -1,6 +1,4 @@
 import numpy as np
-# from numpy.core.arrayprint import dtype_is_implied
-# import pandas as pd
 import math
 import sys
 import os
@@ -281,9 +279,9 @@ class Knn_2:
                     out = 5
                 if out < 0:
                     out = 0
-                out = round(out)
+            out = round(out)
             # print(userId, int(record[1]), out)
-            result.append(out)
+#             result.append(out)
 
             with open(os.path.join(self.out_path, self.testing_out), 'a', encoding='utf-8') as file:
                 file.write(str(out))
