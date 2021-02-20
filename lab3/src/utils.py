@@ -234,6 +234,23 @@ class Knn_2:
                 simV[int(user)] = sumAB / np.sqrt(sumAA) / np.sqrt(sumBB)
         return simV
 
+    def dealMovieV(self, movieV):
+        v1 = 0
+        v2 = 0
+        v3 = 0
+        v4 = 0
+        v5 = 0
+        for movie in movieV:
+            v1 += (movie - 1)*(movie - 1)
+            v2 += (movie - 2)*(movie - 2)
+            v3 += (movie - 3)*(movie - 3)
+            v4 += (movie - 4)*(movie - 4)
+            v5 += (movie - 5)*(movie - 5)
+        v = [v1, v2, v3, v4, v5]
+        ret = np.argmin(v) + 1
+        return ret
+        # return np.mean(movieV)
+
     def getAverMovie(self):
         print('getAverMovie')
         trainDat = os.path.join(self.dataset_path, self.trainData)
@@ -257,7 +274,7 @@ class Knn_2:
                 origin[record[1]][record[0]] = int(record[2])
         averMovie = np.zeros(maxmovie + 1)
         for movie in origin.keys():
-            averMovie[int(movie)] = np.mean(list(origin[movie].values()))
+            averMovie[int(movie)] = self.dealMovieV(list(origin[movie].values()))
         return averMovie
 
     def recommend(self, data, sqrtV, averV, averMovie):
