@@ -33,7 +33,7 @@ def main():
     #     with open(userNewM, "wb") as file:
     #         file.write(str)
     #         print("save to", userNewM)
-    
+
     # userSqrtV = os.path.join(conf["out_path"], conf["userSqrtV"])
     # if os.path.exists(userSqrtV) and (os.path.getsize(userSqrtV) > 0):
     #     with open(userSqrtV, "rb") as file:
@@ -45,15 +45,16 @@ def main():
     #     with open(userSqrtV, "wb") as file:
     #         file.write(str)
     #         print("save to", userSqrtV)
-    
+
     # M.recommend(newM, sqrtV, averV)
 
     M = Knn_2(conf)
     data = M.init()
+    averMovie = M.getAverMovie()
     averV = M.getAverV(data)
-    sqrtV = M.getSqrtV(data,averV)
-    M.getNormalized(data, averV, sqrtV)
-    M.recommend(data, sqrtV, averV)
+    sqrtV = M.getSqrtV(data, averV)
+    data = M.getNormalized(data, averV, sqrtV)
+    M.recommend(data, sqrtV, averV, averMovie)
     # M.validation(data, sqrtV, averV)
 
 

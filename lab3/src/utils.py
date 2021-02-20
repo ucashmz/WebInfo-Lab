@@ -187,8 +187,8 @@ class Knn_2:
         print("getNormalized")
         for user in data.keys():
             for movie in data[user].keys():
-                data[user][movie] = (data[user][movie] -
-                                     averV[int(user)]) / sqrtV[int(user)]
+                data[user][movie] = data[user][movie] - averV[int(user)]
+        return data
         # print(data)
 
     def getSqrtV(self, data, averV):
@@ -210,7 +210,7 @@ class Knn_2:
         Sparse Matrix?
         Only if a movie is rated by both users, calculate the square sum
         '''
-        print("getSim, userId = ", userid)
+        print("getSim, userId =", userid)
         simV = np.zeros(2185)
         userid = str(userid)
         if userid not in data:
@@ -234,9 +234,34 @@ class Knn_2:
                 simV[int(user)] = sumAB / np.sqrt(sumAA) / np.sqrt(sumBB)
         return simV
 
-    def recommend(self, data, sqrtV, averV):
+    def getAverMovie(self):
+        print('getAverMovie')
+        trainDat = os.path.join(self.dataset_path, self.trainData)
+        if not os.path.exists(trainDat):
+            print("not found dataset, it should be WORKPATH/dataset/training.dat")
+            exit()
+        with open(trainDat, 'r', encoding='utf-8') as csvfile:
+            cs = list(csv.reader(csvfile))
+        maxmovie = int(cs[0][0])
+        minmovie = int(cs[0][1])
+        for record in cs:
+            if int(record[1]) > maxmovie:
+                maxmovie = int(record[1])
+            if int(record[1]) < minmovie:
+                minmovie = int(record[1])
+        origin = dict()
+        for record in cs:
+            if int(record[2]) != 0:
+                if record[1] not in origin:
+                    origin[record[1]] = dict()
+                origin[record[1]][record[0]] = int(record[2])
+        averMovie = np.zeros(maxmovie + 1)
+        for movie in origin.keys():
+            averMovie[int(movie)] = np.mean(list(origin[movie].values()))
+        return averMovie
+
+    def recommend(self, data, sqrtV, averV, averMovie):
         print("recommend")
-        result = []
         testDat = os.path.join(self.dataset_path, self.testData)
         if not os.path.exists(testDat):
             print("not found dataset, it should be WORKPATH/dataset/testing.dat")
@@ -247,7 +272,6 @@ class Knn_2:
         userId = int(cs[0][0])
         for record in cs:
             if int(record[0]) != userId:
-                # print("same")
                 userId = int(record[0])
                 simV = self.getSim(data, int(record[0]))
             kNear = []
@@ -272,16 +296,18 @@ class Knn_2:
                 # print(data[str(user)][record[1]])
                 sumSim += simV[user]
             if sumSim == 0:
-                out = averV[userId]
+                # out = averV[userId]
+                out = averMovie[int(record[1])]
             else:
                 out = out/sumSim + averV[userId]
                 if out > 5:
                     out = 5
                 if out < 0:
                     out = 0
-            out = round(out)
+                out = round(out)
+                if (str(out)).find('.') != -1:
+                    out = round(out)
             # print(userId, int(record[1]), out)
-#             result.append(out)
 
             with open(os.path.join(self.out_path, self.testing_out), 'a', encoding='utf-8') as file:
                 file.write(str(out))
