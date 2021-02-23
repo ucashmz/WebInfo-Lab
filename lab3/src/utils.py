@@ -7,6 +7,23 @@ from numpy.core.fromnumeric import size
 
 # https://github.com/csaluja/JupyterNotebooks-Medium
 
+def rounding(rate, zero_one, one_two, two_three, three_four, four_five):
+    if rate > two_three:
+        if rate > three_four:
+            if rate > four_five:
+                return 5
+            else:
+                return 4
+        else:
+            return 3
+    else:
+        if rate > zero_one:
+            if rate > one_two:
+                return 2
+            else:
+                return 1
+        else:
+            return 0
 
 class Knn:
     def __init__(self, config):
@@ -48,14 +65,19 @@ class Knn:
 
         origin = np.zeros((maxmovie + 1, maxuser + 1), dtype=int)
         nonzero = np.zeros(maxuser + 1, dtype=int)
+        zero = np.zeros(maxuser + 1, dtype=int)
         for record in cs:
             origin[int(record[1])][int(record[0])] = int(record[2])
             if int(record[2]) != 0:
                 nonzero[int(record[0])] += 1
+            else:
+                zero[int(record[0])] += 1
         # print(nonzero)
         # print(origin)
         # print(size(nonzero))
-        return origin, nonzero
+        zero = zero / (zero + nonzero + 0.00001) # zero-rate percentage
+        print(zero.sum()/2185)
+        return origin, nonzero, zero
 
     def getAverV(self, origin, nonzero):
         print("getAverV")
@@ -65,7 +87,7 @@ class Knn:
         for i in range(users):
             averV[i] = float(sumV[i] / nonzero[i])
             if math.isnan(averV[i]):
-                averV[i] = float(0)
+                averV[i] = float(2)
         return averV
 
     def genNewM(self, origin, averV):
@@ -81,26 +103,100 @@ class Knn:
         print("getSqrtV")
         sqrtV = np.zeros(newM.shape[1], dtype=float)
         for y in range(newM.shape[1]):
-            sumup = float(0)
-            for x in range(newM.shape[0]):
-                sumup += np.square(newM[x][y])
-            sqrtV[y] = np.sqrt(sumup)
+            sqrtV[y] = np.linalg.norm(newM[:,y])
         return sqrtV
 
     def getSim(self, newM, sqrtV, userid):
         print("getSim")
         simV = np.zeros(newM.shape[1], dtype=float)
         for y in range(newM.shape[1]):
-            sumup = float(0)
-            for x in range(newM.shape[0]):
-                sumup += newM[x][y] * newM[x][userid]
-            simV[y] = sumup/sqrtV[y]/sqrtV[userid]
+            sumup = np.dot(newM[:,y], newM[:,userid])
+            norm = sqrtV[y] *sqrtV[userid]
+            if norm:
+                simV[y] = sumup/norm
+            else:
+                simV[y] = 0
         return simV
+    
+    def predict(self, simV, newM, averV, userId, movieId, nonzero):
+        kNear = []
+        index = 0
+        tmpV = np.copy(simV)
+        while index < 5:
+            maxSim = np.argmax(tmpV)
+            if maxSim == userId:
+                tmpV[maxSim] = -1
+                continue
+            if tmpV[maxSim] <= 0:
+                break
+            if newM[movieId][maxSim] != 0:
+                kNear.append(maxSim)
+                index += 1
+            tmpV[maxSim] = -1
+        # print(kNear)
+        out = 0.0
+        sumSim = 0.0
+        if len(kNear) == 5:
+            for item in kNear:
+                # print(item, simV[item], newM[movieId][item])
+                out += simV[item] * newM[movieId][item]
+                sumSim += simV[item]
+            out = out/sumSim + averV[userId]
+        else:
+            out = averV[userId]
 
-    def recommend(self, newM, sqrtV, averV):
+        out = out * nonzero[userId]
+
+        #if out > 5:
+        #    out = 5
+        #if out < 0:
+        #    out = 0
+        #out = rounding(out, roundingEdge[0], roundingEdge[1], roundingEdge[2], roundingEdge[3], roundingEdge[4])
+
+        # print(userId, movieId, out, nonzero[userId])
+
+        return out
+
+    def recommend(self, newM, sqrtV, averV, zero):
+        print("recommend")
+        count = 0
+        testDat = os.path.join(self.dataset_path, self.testData)
+        if not os.path.exists(testDat):
+            print("not found dataset, it should be WORKPATH/dataset/testing.dat")
+            exit()
+        with open(testDat, 'r', encoding='utf-8') as csvfile:
+            cs = list(csv.reader(csvfile))
+
+        with open(os.path.join(self.out_path, self.testing_out), 'w', encoding='utf-8') as file:
+            simV = self.getSim(newM, sqrtV, int(cs[0][0]))
+            userId = int(cs[0][0])
+            nonzero = np.power(1 - zero, 1.5) # 1.5 is a parameter
+            print("Non zero = ", nonzero[userId])
+            
+            for record in cs:
+                if int(record[0]) != userId:
+                    userId = int(record[0])
+                    simV = self.getSim(newM, sqrtV, int(record[0]))
+                    print("Sim got.")
+                    print("Non zero = ", nonzero[userId])
+
+                out = self.predict(simV, newM, averV, userId, int(record[1]), nonzero)
+                file.write(str(out)+"\n")
+
+                count += 1
+                if count % 1000 == 0:
+                    print(count/1000)
+        
+        print(count)
+
+    def validation(self, newM, sqrtV, averV, zero):
+        np.set_printoptions(threshold=np.inf)
         print("recommend")
         result = []
-        testDat = os.path.join(self.dataset_path, self.testData)
+        count = 0
+        error = 0.0
+
+        testDat = os.path.join(self.dataset_path, self.trainData)
         if not os.path.exists(testDat):
             print("not found dataset, it should be WORKPATH/dataset/testing.dat")
             exit()
@@ -113,32 +209,22 @@ class Knn:
                 print("same")
                 userId = int(record[0])
                 simV = self.getSim(newM, sqrtV, int(record[0]))
-            kNear = []
-            tmpV = simV.tolist()
-            index = 0
-            while index < 5:
-                maxSim = tmpV.index(max(tmpV))
-                if newM[int(record[1])][maxSim] != 0:
-                    kNear.append(maxSim)
-                    index += 1
-                tmpV[maxSim] = -1
-            print(kNear)
-            out = 0.0
-            sumSim = 0.0
-            for item in kNear:
-                out += simV[item] * newM[int(record[1])][item]
-                sumSim += simV[item]
-            out = out/sumSim + averV[userId]
-            print(userId, int(record[1]), out)
-            result.append(out)
+            
+            nonzero = np.power(1 - zero, 1.5) # 1.5 is a parameter
+            
+            out = self.predict(simV, newM, averV, userId, int(record[1]), nonzero)
+            error += math.pow(float(record[2]) - out, 2)
+            
+            count += 1
+            if count % 1000 == 0:
+                print(count/1000)
+            if count == 10000: 
+                break
 
-        original_stdout = sys.stdout
-        with open(os.path.join(self.out_path, self.testing_out), 'w', encoding='utf-8') as file:
-            sys.stdout = file
-            for item in result:
-                print(item)
-            sys.stdout = original_stdout
+        print("RMSE: ", math.sqrt(error/count))
 
+
+        
 
 class Knn_2:
     def __init__(self, config):
