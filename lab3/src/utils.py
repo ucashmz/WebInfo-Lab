@@ -7,6 +7,7 @@ from numpy.core.fromnumeric import size
 
 # https://github.com/csaluja/JupyterNotebooks-Medium
 
+
 def rounding(rate, zero_one, one_two, two_three, three_four, four_five):
     if rate > two_three:
         if rate > three_four:
@@ -24,6 +25,7 @@ def rounding(rate, zero_one, one_two, two_three, three_four, four_five):
                 return 1
         else:
             return 0
+
 
 class Knn:
     def __init__(self, config):
@@ -75,7 +77,7 @@ class Knn:
         # print(nonzero)
         # print(origin)
         # print(size(nonzero))
-        zero = zero / (zero + nonzero + 0.00001) # zero-rate percentage
+        zero = zero / (zero + nonzero + 0.00001)  # zero-rate percentage
         print(zero.sum()/2185)
         return origin, nonzero, zero
 
@@ -103,21 +105,21 @@ class Knn:
         print("getSqrtV")
         sqrtV = np.zeros(newM.shape[1], dtype=float)
         for y in range(newM.shape[1]):
-            sqrtV[y] = np.linalg.norm(newM[:,y])
+            sqrtV[y] = np.linalg.norm(newM[:, y])
         return sqrtV
 
     def getSim(self, newM, sqrtV, userid):
         print("getSim")
         simV = np.zeros(newM.shape[1], dtype=float)
         for y in range(newM.shape[1]):
-            sumup = np.dot(newM[:,y], newM[:,userid])
-            norm = sqrtV[y] *sqrtV[userid]
+            sumup = np.dot(newM[:, y], newM[:, userid])
+            norm = sqrtV[y] * sqrtV[userid]
             if norm:
                 simV[y] = sumup/norm
             else:
                 simV[y] = 0
         return simV
-    
+
     def predict(self, simV, newM, averV, userId, movieId, nonzero):
         kNear = []
         index = 0
@@ -147,9 +149,9 @@ class Knn:
 
         out = out * nonzero[userId]
 
-        #if out > 5:
+        # if out > 5:
         #    out = 5
-        #if out < 0:
+        # if out < 0:
         #    out = 0
         #out = rounding(out, roundingEdge[0], roundingEdge[1], roundingEdge[2], roundingEdge[3], roundingEdge[4])
 
@@ -170,9 +172,9 @@ class Knn:
         with open(os.path.join(self.out_path, self.testing_out), 'w', encoding='utf-8') as file:
             simV = self.getSim(newM, sqrtV, int(cs[0][0]))
             userId = int(cs[0][0])
-            nonzero = np.power(1 - zero, 1.5) # 1.5 is a parameter
+            nonzero = np.power(1 - zero, 1.5)  # 1.5 is a parameter
             print("Non zero = ", nonzero[userId])
-            
+
             for record in cs:
                 if int(record[0]) != userId:
                     userId = int(record[0])
@@ -180,13 +182,14 @@ class Knn:
                     print("Sim got.")
                     print("Non zero = ", nonzero[userId])
 
-                out = self.predict(simV, newM, averV, userId, int(record[1]), nonzero)
+                out = self.predict(simV, newM, averV, userId,
+                                   int(record[1]), nonzero)
                 file.write(str(out)+"\n")
 
                 count += 1
                 if count % 1000 == 0:
                     print(count/1000)
-        
+
         print(count)
 
     def validation(self, newM, sqrtV, averV, zero):
@@ -209,22 +212,21 @@ class Knn:
                 print("same")
                 userId = int(record[0])
                 simV = self.getSim(newM, sqrtV, int(record[0]))
-            
-            nonzero = np.power(1 - zero, 1.5) # 1.5 is a parameter
-            
-            out = self.predict(simV, newM, averV, userId, int(record[1]), nonzero)
+
+            nonzero = np.power(1 - zero, 1.5)  # 1.5 is a parameter
+
+            out = self.predict(simV, newM, averV, userId,
+                               int(record[1]), nonzero)
             error += math.pow(float(record[2]) - out, 2)
-            
+
             count += 1
             if count % 1000 == 0:
                 print(count/1000)
-            if count == 10000: 
+            if count == 10000:
                 break
 
         print("RMSE: ", math.sqrt(error/count))
 
-
-        
 
 class Knn_2:
     def __init__(self, config):
@@ -360,7 +362,8 @@ class Knn_2:
                 origin[record[1]][record[0]] = int(record[2])
         averMovie = np.zeros(maxmovie + 1)
         for movie in origin.keys():
-            averMovie[int(movie)] = self.dealMovieV(list(origin[movie].values()))
+            averMovie[int(movie)] = self.dealMovieV(
+                list(origin[movie].values()))
         return averMovie
 
     def recommend(self, data, sqrtV, averV, averMovie):
