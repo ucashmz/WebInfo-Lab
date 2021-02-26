@@ -1,11 +1,11 @@
 def rounding(data):
     if data > 4.7:
         return 5
-    elif data > 3.5:
+    elif data > 3.6:
         return 4
     elif data > 2.5:
         return 3
-    elif data > 1.6:
+    elif data > 1.4:
         return 2
     elif data > 0.3:
         return 1
