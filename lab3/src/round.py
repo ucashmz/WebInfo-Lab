@@ -12,7 +12,9 @@ def rounding(data):
     else:
         return 0
 
-with open("..\\output\\out_2.22.txt", 'r') as source, open("..\\output\\out_2.22_rounding2.txt", 'w') as result:
+
+with open("../output/out.out", 'r') as source, open("../output/out_rounding.out", 'w') as result:
+    # with open("..\\output\\out_2.22.txt", 'r') as source, open("..\\output\\out_2.22_rounding2.txt", 'w') as result:
     count = 0
     while True:
         data = source.readline()
@@ -21,11 +23,11 @@ with open("..\\output\\out_2.22.txt", 'r') as source, open("..\\output\\out_2.22
             data = float(data)
             #print(count, data)
             data = rounding(data)
-            #print(data)
+            # print(data)
             result.write(str(data)+"\n")
         else:
             break
-        if count%10000 == 0:
+        if count % 10000 == 0:
             print(count//10000)
 
 print(count)

@@ -5,27 +5,6 @@ import os
 import csv
 from numpy.core.fromnumeric import size
 
-# https://github.com/csaluja/JupyterNotebooks-Medium
-
-
-def rounding(rate, zero_one, one_two, two_three, three_four, four_five):
-    if rate > two_three:
-        if rate > three_four:
-            if rate > four_five:
-                return 5
-            else:
-                return 4
-        else:
-            return 3
-    else:
-        if rate > zero_one:
-            if rate > one_two:
-                return 2
-            else:
-                return 1
-        else:
-            return 0
-
 
 class Knn:
     def __init__(self, config):
@@ -43,7 +22,6 @@ class Knn:
         if not os.path.exists(trainDat):
             print("not found dataset, it should be WORKPATH/dataset/training.dat")
             exit()
-        # file_path = os.path.join(self.dataset_path, filename)
         with open(trainDat, 'r', encoding='utf-8') as csvfile:
             cs = list(csv.reader(csvfile))
         maxuser = int(cs[0][0])
@@ -121,10 +99,11 @@ class Knn:
         return simV
 
     def predict(self, simV, newM, averV, userId, movieId, nonzero):
+        k = 10
         kNear = []
         index = 0
         tmpV = np.copy(simV)
-        while index < 5:
+        while index < k:
             maxSim = np.argmax(tmpV)
             if maxSim == userId:
                 tmpV[maxSim] = -1
@@ -138,7 +117,7 @@ class Knn:
         # print(kNear)
         out = 0.0
         sumSim = 0.0
-        if len(kNear) == 5:
+        if len(kNear) == k:
             for item in kNear:
                 # print(item, simV[item], newM[movieId][item])
                 out += simV[item] * newM[movieId][item]
@@ -148,15 +127,6 @@ class Knn:
             out = averV[userId]
 
         out = out * nonzero[userId]
-
-        # if out > 5:
-        #    out = 5
-        # if out < 0:
-        #    out = 0
-        #out = rounding(out, roundingEdge[0], roundingEdge[1], roundingEdge[2], roundingEdge[3], roundingEdge[4])
-
-        # print(userId, movieId, out, nonzero[userId])
-
         return out
 
     def recommend(self, newM, sqrtV, averV, zero):
